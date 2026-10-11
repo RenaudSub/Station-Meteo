@@ -1,0 +1,20 @@
+Station Météo 0.10.0 — validation locale du 11 octobre 2026
+
+Home Assistant 2026.9.4 / Python 3.14 : 29 tests backend réussis.
+JavaScript : node --check réussi.
+Six boutons et traductions vérifiés en français, anglais et espagnol.
+Migration depuis trois boutons : ajout des nouveaux, passage du satellite par
+défaut à Météociel, préservation des cibles et cadrages personnalisés.
+Sources réelles contrôlées : Humidité r8, Pluies 24H r8, Vent en rafales r8
+et GIF animé Meteosat12 visible composition France, sans affichage du site.
+Horodatages et crédits originaux présents dans les images, lien de source,
+actualisation, modes, noms, cibles, case Afficher et réinitialisation indépendante.
+L'animation satellite originale avance réellement entre deux captures.
+Le radar natif conserve ses douze images, horodatage, lecture et arrêt à la
+fermeture. L'option EUMETSAT et son horodatage restent disponibles.
+Contrôles visuels et absence de débordement : PC 1536 px, tablette 900 px,
+téléphone 390 px. Cartes et réglages navigables dans les trois formats.
+Les nouvelles images sources ne sont pas incluses dans l'archive : elles sont
+chargées uniquement à l'ouverture ou à l'actualisation des cartes.
+Le fonctionnement sur le Home Assistant de l’utilisateur reste à confirmer
+après installation. Les cartes dépendent des sources du fournisseur.

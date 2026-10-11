@@ -1,0 +1,14 @@
+{
+  "title": "Station Météo",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Weather Station",
+        "description": "Add the Weather Station panel. Use its gear menu to select entities and run Autoconfig."
+      }
+    },
+    "abort": {
+      "already_configured": "This integration is already configured."
+    }
+  }
+}

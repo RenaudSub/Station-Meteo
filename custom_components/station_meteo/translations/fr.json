@@ -1,0 +1,14 @@
+{
+  "title": "Station Météo",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Station Météo",
+        "description": "Ajoute le panneau Station Météo. Utilise ensuite sa roue dentée pour sélectionner les entités et lancer Autoconfig."
+      }
+    },
+    "abort": {
+      "already_configured": "Cette intégration est déjà configurée."
+    }
+  }
+}

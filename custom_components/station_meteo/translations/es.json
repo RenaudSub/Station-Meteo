@@ -1,0 +1,14 @@
+{
+  "title": "Station Météo",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Estación meteorológica",
+        "description": "Añade el panel Estación meteorológica. Usa el engranaje para seleccionar entidades y ejecutar Autoconfig."
+      }
+    },
+    "abort": {
+      "already_configured": "Esta integración ya está configurada."
+    }
+  }
+}

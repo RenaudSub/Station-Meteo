@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" fill="none">
+  <title>Flèche de direction du vent</title>
+  <desc>Flèche bleue en relief, avec empennage à plumes et pointe ajourée, orientée vers le haut. Calque transparent prévu pour pivoter sur une rose des vents.</desc>
+  <defs>
+    <linearGradient id="blueSteel" x1="118" y1="53" x2="202" y2="278" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D9F4FF"/>
+      <stop offset="0.18" stop-color="#4DB5FF"/>
+      <stop offset="0.48" stop-color="#1677E8"/>
+      <stop offset="0.75" stop-color="#0752B5"/>
+      <stop offset="1" stop-color="#C6EEFF"/>
+    </linearGradient>
+    <linearGradient id="featherBlue" x1="108" y1="250" x2="211" y2="299" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B4EAA"/>
+      <stop offset="0.45" stop-color="#48B3FF"/>
+      <stop offset="1" stop-color="#0B55B8"/>
+    </linearGradient>
+    <linearGradient id="shaftBlue" x1="154" y1="88" x2="166" y2="272" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8F4FF"/>
+      <stop offset="0.24" stop-color="#55B9FF"/>
+      <stop offset="0.58" stop-color="#0874DF"/>
+      <stop offset="1" stop-color="#0B4DAB"/>
+    </linearGradient>
+    <filter id="shadow" x="76" y="0" width="168" height="320" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feOffset dy="2"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="95" y="0" width="130" height="120" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Plumes de l'empennage : quatre ailettes courbes, dessinées derrière la hampe. -->
+    <g fill="url(#featherBlue)" stroke="#073D86" stroke-width="2.2">
+      <path d="M156 228 C144 239 130 249 114 256 C128 268 145 265 159 253 C162 244 160 235 156 228Z"/>
+      <path d="M164 228 C176 239 190 249 206 256 C192 268 175 265 161 253 C158 244 160 235 164 228Z"/>
+      <path d="M156 241 C146 254 137 268 134 284 C149 277 159 264 164 250 C162 246 159 243 156 241Z"/>
+      <path d="M164 241 C174 254 183 268 186 284 C171 277 161 264 156 250 C158 246 161 243 164 241Z"/>
+    </g>
+    <!-- Nervures lumineuses des plumes. -->
+    <g fill="none" stroke="#D9F4FF" stroke-opacity=".86" stroke-width="2">
+      <path d="M158 251 C145 256 133 259 122 260"/>
+      <path d="M162 251 C175 256 187 259 198 260"/>
+      <path d="M158 250 C148 263 141 273 138 279"/>
+      <path d="M162 250 C172 263 179 273 182 279"/>
+    </g>
+    <!-- Hampe : elle traverse le centre et relie les deux extrémités. -->
+    <path d="M160 77 L160 259" stroke="#063E88" stroke-width="11"/>
+    <path d="M160 77 L160 259" stroke="url(#shaftBlue)" stroke-width="7"/>
+    <path d="M158 94 L158 246" stroke="#E8FAFF" stroke-opacity=".82" stroke-width="1.5"/>
+    <!-- Pointe à contour épais et cœur ajouré transparent. -->
+    <path fill="url(#blueSteel)" fill-rule="evenodd" stroke="#063D84" stroke-width="2.6" d="M160 29 L194 86 L171 76 L171 101 L149 101 L149 76 L126 86 Z M160 47 L176 76 L164 71 L164 91 L156 91 L156 71 L144 76 Z"/>
+    <!-- Reflet de bord pour le relief métallique. -->
+    <path d="M160 34 L188 80 L174 73" stroke="#E4F8FF" stroke-opacity=".9" stroke-width="2.3"/>
+    <path d="M146 79 L131 84" stroke="#DDF5FF" stroke-opacity=".85" stroke-width="2"/>
+    <!-- Petit manchon central poli, raccord avec le cabochon de la rose. -->
+    <circle cx="160" cy="160" r="6" fill="#0D5DBD" stroke="#E2F7FF" stroke-width="1.6"/>
+    <circle cx="158" cy="158" r="1.5" fill="#FFFFFF" fill-opacity=".9" stroke="none"/>
+  </g>
+</svg>
