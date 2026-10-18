@@ -1,20 +1,44 @@
-Station Météo 0.10.0 — validation locale du 11 octobre 2026
+Station Météo 1.0.0 — validation locale du 17 octobre 2026
 
-Home Assistant 2026.9.4 / Python 3.14 : 29 tests backend réussis.
-JavaScript : node --check réussi.
-Six boutons et traductions vérifiés en français, anglais et espagnol.
-Migration depuis trois boutons : ajout des nouveaux, passage du satellite par
-défaut à Météociel, préservation des cibles et cadrages personnalisés.
-Sources réelles contrôlées : Humidité r8, Pluies 24H r8, Vent en rafales r8
-et GIF animé Meteosat12 visible composition France, sans affichage du site.
-Horodatages et crédits originaux présents dans les images, lien de source,
-actualisation, modes, noms, cibles, case Afficher et réinitialisation indépendante.
-L'animation satellite originale avance réellement entre deux captures.
-Le radar natif conserve ses douze images, horodatage, lecture et arrêt à la
-fermeture. L'option EUMETSAT et son horodatage restent disponibles.
-Contrôles visuels et absence de débordement : PC 1536 px, tablette 900 px,
-téléphone 390 px. Cartes et réglages navigables dans les trois formats.
-Les nouvelles images sources ne sont pas incluses dans l'archive : elles sont
-chargées uniquement à l'ouverture ou à l'actualisation des cartes.
-Le fonctionnement sur le Home Assistant de l’utilisateur reste à confirmer
-après installation. Les cartes dépendent des sources du fournisseur.
+Home Assistant 2026.9.4 / Python 3.14.
+50 tests backend réussis. Archive durable, reprise après ouverture d’une nouvelle instance,
+moyenne pondérée et extrêmes, cumul avec remise à zéro, changement d’heure,
+année bissextile, données manquantes, compteur constant, conversion d’unités,
+source distincte, intégration d’une vraie intensité, répétition d’import sans doublon,
+reprise d’heure partielle, événements d’états sans panneau ouvert et arrêt propre.
+Import Recorder : requêtes dans son propre exécuteur, bornes des sessions
+Recorder vérifiées avec le vrai schéma SQLAlchemy, coupures non comblées.
+Les tests d’intégration utilisent les vraies API de Home Assistant.
+Navigateur : données des graphiques générées par le vrai moteur d’archives ;
+sept mesures, Heures/7 jours/Mois, navigation, date, cumul bleu, moyenne,
+minimum/maximum, rafales, infobulles, clavier, états partiels/absents/erreur,
+PC 1536 px, tablette 900 px et téléphone 390 px.
+Les cartes personnalisées et les prévisions horaires sont contrôlées en régression.
+L’importation depuis le Recorder d’une installation réelle de l’utilisateur
+et la collecte sur son matériel restent à confirmer après installation.
+
+Ajustement graphique 1.0.0 : moyennes lissées passant par les points exacts,
+bande minimum/maximum sans traits verticaux. Interpolation sans dépassement
+ni croisement des bornes, coupures conservées, série isolée et absence de données
+vérifiées avec tests/archive-series.test.mjs. Histogrammes de pluie conservés.
+Les contrôles navigateur des sept mesures et des trois tailles ont réussi.
+
+Ajustement Soleil/Lune, bulletin et vigilances (1.0.0 conservée) :
+52 tests backend réussis, dont sélection du capteur de vigilance, départements
+multiples, source manuelle, absence de données et dernier état reçu.
+Dernier relevé basé sur last_reported : une vigilance verte inchangée ne devient
+pas périmée uniquement parce que last_updated est ancien.
+Contrôles de mise en page à 1536, 1280, 1024, 900, 768 et 390 px :
+hauteur du bulletin stable pour 9,9 / 10,0 / 99,9 / 100,0 de vitesse capteur,
+textes alignés sur les icônes, zénith sous lever/coucher, absence de collision
+entre les colonnes Soleil/Lune et source officielle dans la zone vent.
+Icônes PNG issues de la première image Ensoleillé, fond transparent, tailles
+256 et 512 px. Leur affichage dans HACS dépend du support de son frontend.
+
+Correction du premier clic (1.0.0 conservée) : problème reproduit avant correction
+en provoquant un redessin entre pointerdown et pointerup (aucune ouverture).
+Régression navigateur réussie après correction : sept arrivées distinctes dans
+le panneau, une par graphique, avec redessin, mise à jour HA et redimensionnement
+pendant l’appui. Le contrôle reste présent et une seule fenêtre s’ouvre dès
+le premier clic. Entrée/Espace, annulation et relâchement hors du bouton vérifiés.
+Contrôles Soleil/Lune, bulletin stable et vigilance toujours réussis sur six tailles.

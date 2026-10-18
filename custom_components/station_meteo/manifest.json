@@ -1,10 +1,12 @@
 {
   "domain": "station_meteo",
-  "name": "Station M\u00e9t\u00e9o",
-  "version": "0.10.0",
+  "name": "Station Météo",
+  "version": "1.0.0",
   "config_flow": true,
   "documentation": "https://github.com/RenaudSub/Station-Meteo",
-  "codeowners": [],
+  "codeowners": [
+    "@RenaudSub"
+  ],
   "dependencies": [
     "frontend",
     "http",
@@ -13,7 +15,8 @@
   ],
   "after_dependencies": [
     "bthome",
-    "weather"
+    "weather",
+    "recorder"
   ],
   "requirements": [
     "Pillow==12.3.0",
@@ -22,5 +25,6 @@
   ],
   "iot_class": "local_push",
   "integration_type": "service",
-  "single_config_entry": true
+  "single_config_entry": true,
+  "issue_tracker": "https://github.com/RenaudSub/Station-Meteo/issues"
 }

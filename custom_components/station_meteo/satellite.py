@@ -63,6 +63,8 @@ def image_urls(times, latitude, longitude, zoom):
 async def async_satellite(hass, runtime, index):
     """Cache source metadata for one minute, shared by all connected panels."""
     cfg = runtime["config"]
+    if not 0 <= index < len(cfg["map_buttons"]):
+        return {"frames": [], "error": "disabled"}
     card = cfg["map_buttons"][index]
     if card["mode"] != "satellite" or not card["enabled"]:
         return {"frames": [], "error": "disabled"}

@@ -1,15 +1,137 @@
-# Station Météo — v0.10.0
+# Station Météo — v1.0.0
 
 Intégration personnalisée Home Assistant avec panneau latéral **Station Météo**.
 Interface inspirée du design validé : bandeau météo, bulletin actuel, rose des vents,
 mesures locales, courbes historiques, prévisions horaires et prévisions de demain.
 Disposition adaptée aux PC, tablettes et smartphones ; français, anglais et espagnol.
 
+### Vue d’ensemble
+
+[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)
+
+### Configuration générale
+
+[![Configuration générale](https://logisub.com/assets/sm-config.jpg?v=0.10.0)](https://logisub.com/assets/sm-config.jpg?v=0.10.0)
+
+### Personnalisations
+
+[![Personnalisations](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)
+
+### Gestion des notifications
+
+[![Gestion des notifications](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)
+
+### Carte des Températures
+
+[![Températures](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)
+
+### Carte Satéllite
+
+[![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
+
+## Version 1.0.0 — historique durable
+
+### Ajustements de présentation et vigilances
+
+Correction du premier clic sur les graphiques : lorsqu’un chargement initial, une mise à jour des états ou un redimensionnement arrive pendant l’appui, le redessin est différé jusqu’à la fin du clic. L’ouverture ne demande plus de clics répétés. Le clavier et l’annulation d’un appui restent pris en charge.
+
+Les vigilances sont affichées sous le vent et la boussole, après une séparation horizontale. Le panneau reprend le capteur **Weather alert** de l’intégration Météo-France de Home Assistant : niveau, phénomènes et heure du dernier relevé HA. Une source unique est détectée automatiquement ; si plusieurs départements sont disponibles, la configuration des entités permet de choisir **Vigilance Météo-France**. Les capteurs rattachés au fournisseur météo Météo-France sélectionné sont prioritaires. Une donnée absente ou de plus de 45 minutes est signalée explicitement et ne devient jamais une vigilance verte. Les dernières informations reçues restent identifiées comme anciennes en cas d’indisponibilité.
+
+Le lien **Bulletin officiel** ouvre la page Météo-France (celle des Pyrénées-Orientales pour le département 66, la carte nationale pour les autres départements). Les textes détaillés et cumuls annoncés dans le bulletin ne sont pas extraits du capteur de niveau. Le panneau n’envoie pas de nouvelles notifications de vigilance dans cette révision.
+
+Le bulletin commence directement par la température, sans le mot « Température », et réserve deux lignes pour limiter les déplacements dus à un chiffre supplémentaire dans le vent. Les descriptions Soleil/Lune sont alignées sur leurs icônes ; le zénith a sa propre ligne et une séparation verticale distingue les colonnes sur les grands écrans.
+
+L’image **Ensoleillé** fournit les icônes PNG statiques dans `custom_components/station_meteo/brand/` (versions claire/sombre, 256 et 512 pixels). Home Assistant 2026.3+ prend en charge ces icônes locales. Certains frontends HACS plus anciens continuent de lire le CDN `home-assistant/brands` et peuvent encore afficher une icône manquante : [problème HACS #5223](https://github.com/hacs/integration/issues/5223). Le dossier `brand/` ne remplace pas une publication sur ce CDN pour ces anciennes versions. Aucun changement de version : **1.0.0**.
+
+
+Cette version intègre l’historique durable des observations, indépendant de la rétention du Recorder de Home Assistant. Elle reprend les fonctions de la v0.11.3.
+
+- Le cumul du jour en bleu dans Précipitations ouvre son histogramme.
+- Tous les grands graphiques utilisent les mêmes commandes : flèches précédent/suivant, choix direct d’une date, Aujourd’hui, actualisation, fermeture en haut à droite et bouton d’échelle **Heures → 7 jours → Mois**.
+- Heures : observations de la journée sélectionnée ; 7 jours : les sept journées se terminant à la date choisie ; Mois : le mois civil sélectionné. Les flèches changent respectivement de jour, de semaine ou de mois.
+- Pluie : quantité tombée par heure ou par jour et cumul de la période dans le titre. Les augmentations et remises à zéro du compteur sont prises en compte. Sans compteur, une véritable intensité en mm/h peut être intégrée.
+- Température, humidité de l’air, UV, rayonnement solaire, pression et vent : moyenne pondérée par la durée, minimum et maximum. La rafale maximale est conservée séparément et affichée pour le vent.
+- Courbe des moyennes lissée passant par les points exacts ; bande discrète entre minimum et maximum, sans barres verticales. Le lissage ne dépasse pas les valeurs et ne relie pas les périodes manquantes.
+- Infobulles au survol, au toucher et au clavier. Les journées de 23/25 heures gardent leurs vraies heures ; le fuseau dans l’infobulle distingue l’heure répétée en hiver.
+- Les données manquantes sont marquées ; les périodes partiellement connues sont signalées. Elles ne deviennent jamais artificiellement zéro.
+- Les observations sont collectées côté Home Assistant même si aucun navigateur n’affiche le panneau.
+
+### Conservation et reprise des données
+
+Le fichier **`/config/station_meteo/history.sqlite3`** contient les agrégats horaires, en unités normalisées et horodatages UTC. Aucune purge automatique n’est effectuée. Il est destiné à permettre de consulter les mêmes périodes les années suivantes. Le bouton de comparaison superposée entre années n’est pas encore ajouté ; la date permet déjà de consulter une autre année.
+
+Les écritures sont regroupées toutes les cinq minutes et effectuées également à l’arrêt normal, à l’enregistrement d’une configuration et lors d’une lecture des graphiques. Une coupure brutale peut perdre les cinq dernières minutes non enregistrées ; l’import Recorder tentera de les reprendre au prochain démarrage. Il n’y a pas de copie de chaque état brut ni de réécriture complète d’un fichier annuel.
+
+Au démarrage, les relevés détaillés du jour sont importés avant la collecte en direct, puis les **60 journées précédentes** sont reprises en arrière-plan si elles sont encore présentes dans le Recorder. Une date plus ancienne peut être importée à la demande si ses états détaillés n’ont pas encore été purgés. Les statistiques de long terme de Home Assistant ne permettent pas de recréer des observations détaillées disparues et ne sont pas utilisées comme substitut.
+
+L’import ne compte pas deux fois les intervalles déjà archivés. Les arrêts connus du Recorder et les périodes `unknown`/`unavailable` laissent des trous explicites. Si l’historique Home Assistant manque ou exclut un capteur, la collecte locale commence avec ses observations disponibles ; les anciennes valeurs ne sont pas inventées. En l’absence de Recorder, la collecte en direct fonctionne quand même. Le redémarrage et les futures mises à jour conservent la base.
+
+La base utilise une série distincte par rôle et source physique. Remplacer l’identifiant du capteur, ou modifier le facteur de conversion lux vers W/m², démarre une nouvelle série sans supprimer l’ancienne ; les graphiques consultent la source actuellement configurée. Les unités de vent et la correction de pression choisies dans le panneau sont appliquées lors de l’affichage.
+
+La base est conservée sous `/config`, hors du dossier de l’intégration remplacé par HACS. Incluez le dossier `/config/station_meteo` dans vos sauvegardes. Pour copier manuellement le fichier de base, arrêtez Home Assistant pour obtenir une copie cohérente.
+
+## Nouveautés v0.11.3
+
+- Correction des cartes personnalisées : prise en charge du radar régional animé `radar2.php?region=so` en mode Carte seule Météociel (régions proposées, pas de 5/15 minutes, pluie ou pluie/neige).
+- L’animation d’origine est affichée seule, avec son horodatage intégré, son bouton d’actualisation et son lien source.
+- Si une adresse reste incompatible avec ce mode, le panneau indique clairement l’échec de sauvegarde et conserve les modifications tant qu’il reste ouvert.
+
+## Nouveautés v0.11.2
+
+- Infobulle sur les prévisions horaires : date, heure, température et pluie prévue, au survol, au toucher ou au clavier.
+- Jusqu’à cinq cartes personnalisées supplémentaires : ajout, suppression, visibilité, nom, ouverture et cible dans Personnalisation.
+- Retrait de la mention technique sous les éphémérides.
+
+## Nouveautés v0.11.1
+
+- Sans capteur d'intensité de pluie distinct, le cadre Précipitations utilise automatiquement le capteur de précipitations cumulées.
+- Le nombre principal affiche la quantité en **mm depuis le début de l'heure en cours**. Le cumul du jour reste affiché dessous comme auparavant.
+- Le graphique devient un histogramme des **12 dernières tranches horaires**, heure en cours incluse. Les mini/maxi du cadre et du graphique agrandi portent sur les mêmes quantités horaires en **mm**, et non sur la valeur absolue du compteur.
+- Le survol, le toucher et le clavier indiquent l'intervalle horaire et sa quantité. L'heure en cours est signalée et sa barre est plus claire. Les heures répétées lors du changement d'heure restent distinctes ; les infobulles indiquent aussi le décalage UTC.
+- Les variations du compteur sont additionnées à chaque intervalle. Une remise à zéro ne crée pas de pluie négative : seule l'accumulation après remise à zéro est ajoutée. Une lecture exactement à la fin d'une heure clôt cet intervalle sans être comptée deux fois.
+- Les périodes sans référence au début de l'heure, ou traversées par un état indisponible, sont omises au lieu de devenir de faux zéros. Une unique valeur historique ancienne et toujours disponible suffit en revanche à représenter des heures sèches : un compteur stable signifie zéro variation.
+- Si aucune donnée historique n'est enregistrée, la valeur actuelle seule ne permet pas d'inventer des cumuls horaires. Aucun capteur supplémentaire ni modification du Recorder n'est créé par l'intégration.
+- Un capteur d'intensité distinct conserve le fonctionnement en **mm/h**, sa courbe et ses mini/maxi habituels. Une même entité placée par erreur dans les deux champs est traitée comme un cumul.
+
+Dans Configuration, renseignez **Précipitations cumulées** avec votre compteur en mm et laissez **Précipitations** vide si vous ne possédez pas de capteur d'intensité. L'adaptation est automatique après mise à jour. Les quantités horaires sont attribuées selon les changements reçus du compteur ; elles ne constituent pas une mesure d'intensité instantanée.
+
+## Nouveautés v0.11.0
+
+- Éphémérides entièrement locales : aucun appel à un site pour le saint, la citation ou le dicton.
+- Trois listes JSON de **366 entrées chacune**, couvrant toutes les dates et le 29 février séparément.
+- Deux nouveaux onglets administrateur **Citations** et **Dictons** dans la configuration, avec navigation par mois, auteur facultatif, sauvegarde et retour aux textes fournis.
+- Les textes personnalisés et les corrections du calendrier survivent aux mises à jour.
+- Le bulletin reflète une liste enregistrée immédiatement sur le panneau utilisé ; les autres panneaux la relisent à leur prochaine actualisation des éphémérides (au plus tard une heure). Les modifications directes des fichiers sont relues à cette même actualisation, ou à la réouverture du panneau.
+
+### Fichiers locaux et personnalisation
+
+Au premier démarrage, l'intégration crée dans le **dossier de configuration Home Assistant** :
+
+```text
+station_meteo/almanac/saints.json
+station_meteo/almanac/citations.json
+station_meteo/almanac/dictons.json
+```
+
+Sur HA OS, le chemin habituel commence par `/config/`. Les fichiers livrés dans `custom_components/station_meteo/almanac/` sont uniquement les valeurs initiales. Les mises à jour ne remplacent jamais les copies personnalisées. Sauvegardez le dossier `station_meteo/almanac` avec votre configuration.
+
+Chaque fichier utilise les dates **MM-DD**, par exemple `10-15`, et conserve les 366 clés, dont `02-29`. Cette méthode ne décale pas mars lors des années bissextiles. Les textes sont en UTF-8. `saints.json` et `dictons.json` associent une date à un texte ; `citations.json` associe une date à un objet `text` et `author` (auteur vide autorisé). Un texte ne peut pas être vide ; maximum 600 caractères, et 120 pour l'auteur.
+
+Les saints/fêtes constituent un calendrier français fixe : certaines traditions peuvent choisir un autre saint pour une même date. Une correction se fait directement dans `saints.json`, sans onglet spécifique. Les fêtes mobiles ne sont pas calculées dans ce fichier.
+
+**Configuration → Citations / Dictons** : choisir le mois, modifier une ou plusieurs dates et cliquer **Enregistrer cette liste**. Le dialogue reste ouvert pour continuer. Chaque liste s'enregistre indépendamment des réglages généraux. Fermer abandonne les changements non enregistrés. **Rétablir les textes fournis** ne devient définitif qu'après Enregistrer. **Recharger cette liste depuis le fichier** abandonne le brouillon de cette liste et récupère sa dernière version sur disque. En cas de modification concurrente, le brouillon est conservé et un message demande de recharger ; copiez vos saisies avant de le faire.
+
+Les 366 citations et 366 dictons saisonniers fournis sont des **créations originales en français**, sans fausse attribution à des auteurs célèbres ni présentation comme proverbes traditionnels. Ils sont conçus pour être remplacés par les textes de votre choix. Les dictons ne constituent pas des prévisions météo. Les boutons et messages des éditeurs sont traduits en français, anglais et espagnol ; le contenu des fichiers reste celui que vous avez choisi.
+
+Un fichier absent ou invalide utilise temporairement les textes livrés, sans écraser votre fichier. L'éditeur signale le problème ; enregistrer une liste valide permet de réparer son fichier. Les fichiers se remplacent de façon atomique et une vérification de version évite d'écraser la sauvegarde d'un autre administrateur. Ces deux éditeurs sont réservés aux administrateurs Home Assistant.
+
+Le changement de date suit le **fuseau Home Assistant** et se détecte lors du rafraîchissement du panneau (une minute au maximum quand il est actif). Les heures du soleil et les phases de Lune restent calculées localement. L'option d'affichage des éphémérides peut toujours être désactivée.
+
 ## Nouveautés v0.10.0
 
 - Trois boutons supplémentaires : **Humidité**, **Pluies 24H** et **Vent en rafales**, sur la région Météociel `r8` par défaut.
 - Les six boutons sont personnalisables : nom, cible, mode d'ouverture et case Afficher ; réinitialisation indépendante.
-- Le satellite utilise par défaut l'animation Météociel **composition visible MTG/Meteosat12 sur la France**. L'animation GIF originale se lit automatiquement ; son horaire change sur chaque image.
+- Le satellite utilise par défaut l'animation Météociel **composition visible MTG/Meteosat12 sur la France**.L'animation GIF originale se lit automatiquement son horaire change sur chaque image.
 - Les trois nouvelles cartes et le satellite s'affichent seuls, avec un bouton Actualiser et le lien Météociel en bas à droite. Les horodatages et crédits inscrits sur les images sont conservés, sans superposer une heure de téléchargement à l'heure réelle des observations.
 - Les réglages existants sont conservés. Les nouveaux boutons s'ajoutent automatiquement. Le satellite EUMETSAT non personnalisé bascule vers le nouveau défaut Météociel ; un cadrage EUMETSAT personnalisé ou une cible différente reste conservé.
 
@@ -47,7 +169,7 @@ Les images sont chargées à l'ouverture ou à l'actualisation, avec des métado
 - Mini/maxi de la période affichée (12 heures), à droite du titre agrandi et dans les six cadres de capteurs. Les calculs utilisent les mesures brutes et excluent les états indisponibles.
 - Infobulles sur les icônes météo du bandeau et des prévisions.
 - Sous le bulletin : lever, coucher et midi solaire (zénith), phase de lune et estimation de la fraction éclairée.
-- Éphémérides : saint, citation et dicton du jour depuis [ephemeride-jour.fr](https://www.ephemeride-jour.fr/), lien de source, une récupération réussie par jour. Les textes du fournisseur restent en français.
+- Éphémérides : saint, citation et dicton du jour (source en ligne dans la v0.7.0, remplacée par les fichiers locaux depuis la v0.11.0).
 
 Dans **Configuration de la station**, les champs **Latitude** et **Longitude** peuvent rester vides pour utiliser l’emplacement de Home Assistant. Pour la station de cet exemple : `42.627506`, `2.593331`, altitude `247 m`. Les heures utilisent le fuseau de Home Assistant. Le « zénith » désigne ici le midi solaire (hauteur maximale du Soleil), pas un passage vertical au-dessus de l’observateur. Le calcul ne tient pas compte des reliefs qui masquent l’horizon.
 
@@ -133,7 +255,7 @@ et autres réglages existants sont conservés. Les notifications ajoutées reste
 
 ## Installation manuelle
 
-1. Décompressez `Station-Meteo-v0.10.0.zip` sur votre ordinateur.
+1. Décompressez `Station-Meteo-v1.0.0.zip` sur votre ordinateur.
 2. Copiez le dossier **`custom_components/station_meteo`** dans
    **`/config/custom_components/station_meteo`** sur Home Assistant.
    Le fichier manifest doit être exactement à :
@@ -248,15 +370,9 @@ Les informations manquantes ou indisponibles s'affichent **—**, jamais comme z
 Autoconfig signale les entités désactivées ; activez celles souhaitées depuis BTHome,
 puis relancez Autoconfig. Une entité dont le rôle est ambigu reste à choisir manuellement.
 
-Les courbes locales, minima/maxima du jour et tendances utilisent **Historique/Recorder**.
-Elles nécessitent des données enregistrées. Les minima/maxima portent sur les échantillons
-disponibles pour la journée dans le fuseau Home Assistant. Le cumul quotidien est calculé
-sur le compteur de pluie, avec prise en compte de ses remises à zéro, seulement lorsqu'un
-échantillon de référence avant minuit et des données du jour sont disponibles. Sinon,
-le panneau affiche **Cumul mesuré**, sans le présenter comme un cumul quotidien.
-Les graphiques affichent jusqu'à 12 h d'historique local ; les données de 30 h sont
-consultées pour les calculs journaliers. Les courbes sont relues toutes les 5 minutes,
-les prévisions toutes les 10 minutes ; les valeurs instantanées suivent Home Assistant.
+Les petits tracés de 12 heures, les minima/maxima des cadres et les tendances utilisent **Historique/Recorder**. Ils nécessitent des états enregistrés ; 30 heures sont consultées pour les calculs du jour. Le cumul quotidien utilise l’archive durable quand la journée est complètement couverte, sinon le calcul sur le compteur du Recorder lorsqu’une référence avant minuit est disponible. En l’absence de référence suffisante, le panneau affiche **Cumul mesuré**.
+
+Les grands graphiques lisent l’archive durable propre à la station et permettent de consulter une journée, sept jours ou un mois même après purge du Recorder. Les mini-courbes et le cumul du tableau de bord sont relus toutes les cinq minutes, les prévisions toutes les dix minutes ; les valeurs instantanées suivent Home Assistant. Le grand graphique se rafraîchit toutes les minutes lorsqu’il est ouvert, et plus rapidement pendant l’import initial.
 Sur téléphone, les cartes horaires défilent horizontalement.
 
 Cette intégration exploite les données existantes : elle n'améliore pas la liaison

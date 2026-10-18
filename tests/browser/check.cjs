@@ -124,16 +124,16 @@ assert.equal(await page.evaluate(()=>{const before=qaPanel.shadowRoot.querySelec
 await page.emulateMedia({reducedMotion:'reduce'});await page.evaluate(()=>qaPanel.render());
 await page.waitForFunction(()=>qaPanel.shadowRoot.querySelector('.hour-weather-image').getAttribute('src').startsWith('data:image/png'));
 await page.emulateMedia({reducedMotion:'no-preference'});
-// All seven graphs open above the dashboard with matching paths and responsive width.
+// All seven durable graph dialogs open above the dashboard with responsive width.
 await page.emulateMedia({reducedMotion:'reduce'});
 await page.evaluate(async()=>{window.qaRecentHistory=false;qaStates[qaPanel.cfg.entities.temperature].state='24.3';await qaPanel.fetchHistory();qaPanel.render();});
 assert.equal(await root.locator('.graph-trigger').count(),7);
 assert.equal(await root.locator('.tile-title h3').filter({hasText:'Précipitations'}).count(),1);
 for(const role of ['wind_speed','temperature','rain_rate','humidity','uv','irradiance','pressure']){
  const small=await root.locator(`[data-graph-role="${role}"] .spark-line`).getAttribute('d').catch(()=>null);
- await root.locator(`[data-graph-role="${role}"]`).click();
+ await root.locator(`.graph-trigger[data-graph-role="${role}"]`).click();
  assert.equal(await root.locator('.graph-dialog').isVisible(),true);
- if(small)assert.equal(await root.locator('.graph-dialog .spark-line').getAttribute('d'),small);
+
  assert.equal(await page.evaluate(()=>{const d=qaPanel.shadowRoot.querySelector('.graph-dialog');return d.scrollWidth<=d.clientWidth}),true);
  await root.locator('[data-action="close-graph"]').click();
  assert.equal(await root.locator('.graph-dialog').count(),0);

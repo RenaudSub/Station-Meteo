@@ -120,6 +120,7 @@ async def city_labels(session, view):
 
 # Explicit page types and image selectors; user targets never become arbitrary hosts.
 IMAGE_PAGES = {
+    "/observations-meteo/radar2.php": ("radar_animation", "img", None),
     "/observations-meteo/humi.php": ("humidity", "obs_temps", "humi"),
     "/observations-meteo/rr.php": ("rain24", "obs_temps", "rr"),
     "/observations-meteo/vent-rafales.php": ("gusts", "obs_temps", "rafales"),
@@ -137,14 +138,25 @@ def source_spec(url):
         raise ValueError("Use a supported HTTPS Meteociel map URL")
     kind, selector, prefix = IMAGE_PAGES[parsed.path]
     params = parse_qs(parsed.query, keep_blank_values=True)
-    if set(params) - {"region", "mode"} or any(len(v) != 1 for v in params.values()):
+    if set(params) - ({"region", "mode", "freq"} if kind == "radar_animation" else {"region", "mode"}) or any(len(v) != 1 for v in params.values()):
         raise ValueError("Unsupported native Meteociel parameters")
-    region = params.get("region", ["fr" if kind == "satellite" else ""])[0]
+    region = params.get("region", ["fr" if kind in ("satellite", "radar_animation") else ""])[0]
     if region and not re.fullmatch(r"[a-z0-9]{1,12}", region):
         raise ValueError("Invalid map region")
     mode = params.get("mode", ["animation-visible-composition-mtg" if kind == "satellite" else "0"])[0]
-    if not re.fullmatch(r"[a-z0-9-]{1,80}", mode) or (kind != "satellite" and mode != "0") or (kind == "satellite" and "archive" in mode):
+    if not re.fullmatch(r"[a-z0-9-]{1,80}", mode) or (kind not in ("satellite", "radar_animation") and mode != "0") or (kind == "satellite" and "archive" in mode):
         raise ValueError("Unsupported native map product")
+    if kind == "radar_animation":
+        if region not in {"fr", "no", "ne", "so", "se", "re", "re2", "ant1", "ant2", "ant3", "uk", "de", "sp", "it", "na"}:
+            raise ValueError("Unsupported radar region")
+        if mode not in {"0", "1"}:
+            raise ValueError("Unsupported radar product")
+        frequency = params.get("freq", ["5"])[0]
+        if frequency not in {"5", "15"}:
+            raise ValueError("Unsupported radar frequency")
+        return {"kind": kind, "selector": selector, "prefix": None,
+                "page": "https://www.meteociel.fr" + parsed.path,
+                "params": {"region": region, "mode": mode, "freq": frequency}}
     request_params = {"region": region}
     if kind == "satellite" or kind == "gusts":
         request_params["mode"] = mode
@@ -179,6 +191,11 @@ def map_image_url(html, spec):
         raise ValueError("Unexpected map image URL")
     if spec["kind"] == "satellite":
         trusted = re.fullmatch(r"(?:modeles\d+|static|www)\.meteociel\.fr", parsed.hostname or "") and re.fullmatch(r"/satellite/[a-zA-Z0-9_-]+\.(?:gif|png|jpg|jpeg)", parsed.path)
+    elif spec["kind"] == "radar_animation":
+        region = re.escape(spec["params"]["region"])
+        product = "lastsnowradar" if spec["params"]["mode"] == "1" else "lastradar"
+        frequency = "5m" if spec["params"]["freq"] == "5" else ""
+        trusted = parsed.hostname in ("www.meteociel.fr", "static.meteociel.fr") and re.fullmatch(rf"/cartes_obs/radar/{product}{frequency}_{region}\.gif", parsed.path)
     else:
         suffix = "_" + spec["params"]["region"] if spec["params"]["region"] else ""
         trusted = parsed.hostname in ("www.meteociel.fr", "static.meteociel.fr") and parsed.path == f'/cartes_obs/{spec["prefix"]}{suffix}.png'
@@ -212,12 +229,14 @@ async def async_image_map(session, runtime, card, spec):
 
 async def async_meteociel(hass, runtime, index):
     """Get the latest observations when opened/refreshed, with a short shared cache."""
+    if not 0 <= index < len(runtime["config"]["map_buttons"]):
+        return {"frames": [], "error": "disabled"}
     card = runtime["config"]["map_buttons"][index]
     if card["mode"] != "meteociel" or not card["enabled"]:
         return {"frames": [], "error": "disabled"}
     try:
         view = source_spec(card["url"])
-        if view["kind"] in ("humidity", "rain24", "gusts", "satellite"):
+        if view["kind"] in ("humidity", "rain24", "gusts", "satellite", "radar_animation"):
             return await async_image_map(async_get_clientsession(hass), runtime, card, view)
         plan = tile_plan(view)
         now = datetime.now(timezone.utc)

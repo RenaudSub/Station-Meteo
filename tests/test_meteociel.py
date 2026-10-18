@@ -115,3 +115,35 @@ async def test_image_metadata_cache_refreshes_image_url_and_keeps_embedded_time(
         clock.now.return_value=now+timedelta(seconds=65)
         await async_image_map(None,runtime,card,spec)
         assert reader.await_count==2
+
+
+def test_regional_animated_radar_sources():
+    from custom_components.station_meteo.meteociel import source_spec, map_image_url
+    base = 'https://www.meteociel.fr/observations-meteo/radar2.php?region=so'
+    for mode, product in [('0', 'lastradar'), ('1', 'lastsnowradar')]:
+        for freq, suffix in [('5', '5m'), ('15', '')]:
+            spec = source_spec(base + f'&mode={mode}&freq={freq}')
+            assert spec['kind'] == 'radar_animation'
+            assert spec['params'] == {'region': 'so', 'mode': mode, 'freq': freq}
+            path = f'/cartes_obs/radar/{product}{suffix}_so.gif'
+            assert map_image_url(f'<img src="{path}" id="img">', spec) == 'https://www.meteociel.fr' + path
+    spec = source_spec(base)
+    assert spec['params'] == {'region': 'so', 'mode': '0', 'freq': '5'}
+    for url in [base+'&freq=1', base+'&mode=2', base+'&archive=1', base+'&region=ne', base.replace('region=so','region=../../admin'), base.replace('www.meteociel.fr','example.org')]:
+        with pytest.raises(ValueError): source_spec(url)
+    for src in ['https://example.org/cartes_obs/radar/lastradar5m_so.gif', '/cartes_obs/radar/lastradar5m_ne.gif', '/cartes_obs/radar/lastradar_so.gif', '/cartes_obs/radar/../admin.php']:
+        with pytest.raises(ValueError): map_image_url(f'<img src="{src}" id="img">', spec)
+
+
+@pytest.mark.asyncio
+async def test_custom_radar_native_load_and_refresh():
+    from custom_components.station_meteo.meteociel import async_meteociel
+    card = {**DEFAULT_MAP_BUTTONS[0], 'id': 'custom1', 'name': 'Précipitations', 'mode': 'meteociel', 'url': 'https://www.meteociel.fr/observations-meteo/radar2.php?region=so'}
+    runtime = {'config': {'map_buttons': deepcopy(DEFAULT_MAP_BUTTONS) + [card]}}
+    reader = AsyncMock(return_value='<img src="/cartes_obs/radar/lastradar5m_so.gif" name="img" id="img">')
+    with patch('custom_components.station_meteo.meteociel.read_source', reader), patch('custom_components.station_meteo.meteociel.async_get_clientsession', return_value=None):
+        result = await async_meteociel(None, runtime, 6)
+    assert result['animated'] and result['image_only'] and result['embedded_time']
+    assert result['frames'][0]['url'].startswith('https://www.meteociel.fr/cartes_obs/radar/lastradar5m_so.gif?station_meteo_refresh=')
+    assert result['source'] == card['url']
+    assert await async_meteociel(None, runtime, 10) == {'frames': [], 'error': 'disabled'}

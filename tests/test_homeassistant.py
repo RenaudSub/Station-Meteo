@@ -62,6 +62,13 @@ async def test_panel_catalog_storage_and_permissions(tmp_path):
         handler,_=hass.data['websocket_api']['station_meteo/save']
         with pytest.raises(Unauthorized):
             handler(hass,SimpleNamespace(user=SimpleNamespace(is_admin=False)),{'id':1,'type':'station_meteo/save','config':valid})
+        for endpoint in ('station_meteo/almanac','station_meteo/almanac_save'):
+            protected,_=hass.data['websocket_api'][endpoint]
+            with pytest.raises(Unauthorized):
+                protected(hass,SimpleNamespace(user=SimpleNamespace(is_admin=False)),{'id':2,'type':endpoint})
+        assert (tmp_path/'station_meteo'/'almanac'/'saints.json').is_file()
+        assert (tmp_path/'station_meteo'/'almanac'/'citations.json').is_file()
+        assert (tmp_path/'station_meteo'/'almanac'/'dictons.json').is_file()
         assert await async_unload_entry(hass,entry)
         assert 'station-meteo' not in hass.data[frontend.DATA_PANELS]
         assert await async_setup_entry(hass,entry)

@@ -1,9 +1,9 @@
 """Station Météo constants."""
 DOMAIN = "station_meteo"
-VERSION = "0.10.0"
+VERSION = "1.0.0"
 WEATHER_CONDITIONS = ("sunny", "clear-night", "partlycloudy", "cloudy", "rainy", "pouring", "snowy", "snowy-rainy", "lightning", "lightning-rainy", "fog", "windy", "windy-variant", "hail", "exceptional")
 PANEL_PATH = "station-meteo"
-ROLES = ("temperature", "humidity", "pressure", "illuminance", "irradiance", "uv", "wind_speed", "wind_gust", "wind_direction", "rain_total", "rain_rate", "rain_status", "dew_point", "battery", "signal", "weather", "weather_fallback", "bulletin")
+ROLES = ("temperature", "humidity", "pressure", "illuminance", "irradiance", "uv", "wind_speed", "wind_gust", "wind_direction", "rain_total", "rain_rate", "rain_status", "dew_point", "battery", "signal", "weather", "weather_fallback", "bulletin", "weather_alert")
 DEFAULT_NOTIFICATIONS = {
     "enabled": False, "recipients": [], "pressure": True, "pressure_drop": 3,
     "rain": True, "gust": False, "gust_threshold": 60, "storm": True, "cooldown": 60,
@@ -36,4 +36,6 @@ def normalize_map_buttons(cards):
         if i == 2 and card["mode"] == "satellite" and card["url"] == "https://view.eumetsat.int/" and card["latitude"] is None and card["longitude"] is None and card["zoom"] == 4:
             card.update(mode=default["mode"], url=default["url"])
         result.append(card)
+    if isinstance(cards, list):
+        result.extend(dict(card) for card in cards[len(DEFAULT_MAP_BUTTONS):] if isinstance(card, dict))
     return result

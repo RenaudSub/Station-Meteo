@@ -1,5 +1,6 @@
 """Authenticated panel settings and BTHome device discovery."""
 import math
+import sqlite3
 from urllib.parse import urlsplit, unquote
 import voluptuous as vol
 from homeassistant.components import websocket_api
@@ -127,11 +128,20 @@ def validate_config(hass, data):
     opts["recipients"] = list(dict.fromkeys(recipients))
     result["notifications"] = opts
     cards = result["map_buttons"]
-    if not isinstance(cards, list) or len(cards) != len(DEFAULT_MAP_BUTTONS):
-        raise ValueError("Expected six map buttons")
+    if not isinstance(cards, list) or not len(DEFAULT_MAP_BUTTONS) <= len(cards) <= len(DEFAULT_MAP_BUTTONS) + 5:
+        raise ValueError("Expected six built-in buttons and at most five custom buttons")
     normalized = []
+    custom_ids = set()
     for index, card in enumerate(cards):
-        default = DEFAULT_MAP_BUTTONS[index]
+        custom = index >= len(DEFAULT_MAP_BUTTONS)
+        if custom:
+            identity = card.get("id") if isinstance(card, dict) else None
+            if identity not in {f"custom{i}" for i in range(1, 6)} or identity in custom_ids:
+                raise ValueError("Invalid custom map identity")
+            custom_ids.add(identity)
+            default = {**DEFAULT_MAP_BUTTONS[0], "id": identity, "name": "", "mode": "iframe"}
+        else:
+            default = DEFAULT_MAP_BUTTONS[index]
         if not isinstance(card, dict) or set(card) - set(default):
             raise ValueError("Invalid map button")
         card = {**default, **card}
@@ -148,7 +158,10 @@ def validate_config(hass, data):
         if not (parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password):
             raise ValueError("Map URLs must use HTTPS")
         if card["mode"] == "meteociel":
-            source_spec(url)
+            try:
+                source_spec(url)
+            except ValueError as err:
+                raise ValueError(f"native_map_unsupported: {card['name'] or card['id']}") from err
         for field, bound in (("latitude", 90), ("longitude", 180)):
             value = card[field]
             if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not -bound <= value <= bound):
@@ -184,8 +197,14 @@ async def ws_save(hass, connection, msg):
         data = validate_config(hass, msg["config"])
         async with runtime["lock"]:
             await runtime["store"].async_save(data)
+            if runtime.get("archive"):
+                from datetime import datetime, timezone
+                runtime["archive"].sample(datetime.now(timezone.utc).timestamp())
+                await runtime["archive"].drain(True)
             runtime["config"] = data
-    except (ValueError, OSError) as err:
+        if runtime.get("archive"):
+            await runtime["archive"].reconfigure()
+    except (ValueError, OSError, sqlite3.Error) as err:
         connection.send_error(msg["id"], "invalid_config", str(err))
         return
     connection.send_result(msg["id"], data)
@@ -233,7 +252,7 @@ async def ws_ephemeris(hass, connection, msg):
     connection.send_result(msg["id"], await async_ephemeris(hass, runtime))
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/satellite", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)-1))})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/satellite", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4))})
 @websocket_api.async_response
 async def ws_satellite(hass, connection, msg):
     runtime = hass.data.get(DOMAIN, {})
@@ -243,7 +262,7 @@ async def ws_satellite(hass, connection, msg):
     connection.send_result(msg["id"], await async_satellite(hass, runtime, msg["index"]))
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)-1))})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4))})
 @websocket_api.async_response
 async def ws_meteociel(hass, connection, msg):
     runtime = hass.data.get(DOMAIN, {})
@@ -253,7 +272,74 @@ async def ws_meteociel(hass, connection, msg):
     connection.send_result(msg["id"], await async_meteociel(hass, runtime, msg["index"]))
 
 
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/almanac"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_almanac(hass, connection, msg):
+    runtime = hass.data.get(DOMAIN, {})
+    if not runtime.get("loaded"):
+        connection.send_error(msg["id"], "not_loaded", "Station Météo is not loaded")
+        return
+    service = runtime["almanac"]
+    try:
+        async with service.lock:
+            result = await hass.async_add_executor_job(service.editors)
+        connection.send_result(msg["id"], result)
+    except (OSError, ValueError):
+        connection.send_error(msg["id"], "almanac_unavailable", "Local almanac files are unavailable")
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/almanac_save",
+    vol.Required("kind"): vol.In(("citations", "dictons")), vol.Required("entries"): dict,
+    vol.Required("revision"): vol.Match(r"^[a-f0-9]{64}$")})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_almanac_save(hass, connection, msg):
+    runtime = hass.data.get(DOMAIN, {})
+    if not runtime.get("loaded"):
+        connection.send_error(msg["id"], "not_loaded", "Station Météo is not loaded")
+        return
+    service = runtime["almanac"]
+    try:
+        async with service.lock:
+            result = await hass.async_add_executor_job(service.save, msg["kind"], msg["entries"], msg["revision"])
+        connection.send_result(msg["id"], result)
+    except (OSError, ValueError) as err:
+        conflict = str(err) == "almanac_conflict"
+        connection.send_error(msg["id"], "almanac_conflict" if conflict else "invalid_almanac", "almanac_conflict" if conflict else "Invalid calendar or local file could not be saved")
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/history", vol.Required("role"): vol.In(('rain', 'temperature', 'humidity', 'uv', 'irradiance', 'pressure', 'wind_speed')), vol.Required("date"): str, vol.Required("scale"): vol.In(('hour', 'week', 'month'))})
+@websocket_api.async_response
+async def ws_history(hass, connection, msg):
+    from datetime import date
+    import sqlite3
+    runtime = hass.data.get(DOMAIN, {})
+    if not runtime.get("loaded") or "archive" not in runtime:
+        connection.send_error(msg["id"], "not_loaded", "Station Météo is not loaded")
+        return
+    try:
+        day = date.fromisoformat(msg["date"])
+        if day.isoformat() != msg["date"]:
+            raise ValueError("Invalid date")
+        result = await runtime["archive"].query(msg["role"], day, msg["scale"])
+        connection.send_result(msg["id"], result)
+    except (ValueError, OSError, sqlite3.Error) as err:
+        connection.send_error(msg["id"], "history_unavailable", str(err))
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/vigilance"})
+@websocket_api.async_response
+async def ws_vigilance(hass, connection, msg):
+    from .vigilance import current_alerts
+    runtime = hass.data.get(DOMAIN, {})
+    if not runtime.get("loaded"):
+        connection.send_error(msg["id"], "not_loaded", "Station Météo is not loaded")
+        return
+    connection.send_result(msg["id"], current_alerts(hass, runtime))
+
+
 @callback
 def async_register_commands(hass: HomeAssistant):
-    for command in (ws_config, ws_catalog, ws_save, ws_forecast, ws_ephemeris, ws_satellite, ws_meteociel, ws_notification_targets, ws_entity_exclusions):
+    for command in (ws_vigilance, ws_history, ws_almanac, ws_almanac_save, ws_config, ws_catalog, ws_save, ws_forecast, ws_ephemeris, ws_satellite, ws_meteociel, ws_notification_targets, ws_entity_exclusions):
         websocket_api.async_register_command(hass, command)
