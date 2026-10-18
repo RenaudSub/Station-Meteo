@@ -261,7 +261,7 @@
   "history_next": "Next period",
   "history_date": "Choose a date",
   "history_today": "Today",
-  "history_scale_hour": "Hours",
+  "history_scale_hour": "Day · 15 min",
   "history_scale_week": "7 days",
   "history_scale_month": "Month",
   "history_cycle": "Change scale: Hours → 7 days → Month",
@@ -295,5 +295,10 @@
   "vigilance_missing": "Warning status unverified: check the official bulletin.",
   "vigilance_received": "HA report received",
   "vigilance_last_received": "Last HA report received",
-  "vigilance_bulletin": "Official bulletin"
+  "vigilance_bulletin": "Official bulletin",
+  "history_legacy": "Older hourly observations retain their original resolution.",
+  "history_future": "Upcoming",
+  "history_value": "Measured value",
+  "history_detail_legend": "Line: detailed day readings · band and markers: 15-minute archive",
+  "history_gust_legend": "Orange: peak gusts per period"
 }

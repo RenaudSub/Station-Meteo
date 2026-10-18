@@ -261,7 +261,7 @@
   "history_next": "Período siguiente",
   "history_date": "Elegir fecha",
   "history_today": "Hoy",
-  "history_scale_hour": "Horas",
+  "history_scale_hour": "Día · 15 min",
   "history_scale_week": "7 días",
   "history_scale_month": "Mes",
   "history_cycle": "Cambiar escala: Horas → 7 días → Mes",
@@ -295,5 +295,10 @@
   "vigilance_missing": "Vigilancia sin verificar: consulte el boletín oficial.",
   "vigilance_received": "Informe HA recibido el",
   "vigilance_last_received": "Último informe HA recibido el",
-  "vigilance_bulletin": "Boletín oficial"
+  "vigilance_bulletin": "Boletín oficial",
+  "history_legacy": "Las mediciones horarias anteriores conservan su resolución original.",
+  "history_future": "Próximamente",
+  "history_value": "Valor medido",
+  "history_detail_legend": "Curva: mediciones detalladas del día · banda y puntos: archivo de 15 min",
+  "history_gust_legend": "Naranja: rachas máximas por período"
 }

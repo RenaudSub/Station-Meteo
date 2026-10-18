@@ -1,4 +1,4 @@
-"""Durable, duration-weighted hourly observations, independent from Recorder retention."""
+"""Durable, duration-weighted quarter-hour observations, independent from Recorder retention."""
 from __future__ import annotations
 
 import asyncio
@@ -17,6 +17,7 @@ from homeassistant.helpers.event import async_track_time_interval
 
 _LOGGER = logging.getLogger(__name__)
 UTC = timezone.utc
+BUCKET_SECONDS = 900
 ROLES = ('rain', 'temperature', 'humidity', 'uv', 'irradiance', 'pressure', 'wind_speed', 'wind_gust')
 
 
@@ -28,6 +29,11 @@ def boundaries(day: date, zone: str):
 
 def hour_start(stamp: float, zone: str):
     return datetime.fromtimestamp(stamp, ZoneInfo(zone)).replace(minute=0, second=0, microsecond=0).timestamp()
+
+
+def quarter_start(stamp: float, zone: str):
+    local = datetime.fromtimestamp(stamp, ZoneInfo(zone))
+    return local.replace(minute=local.minute // 15 * 15, second=0, microsecond=0).timestamp()
 
 
 @dataclass(frozen=True)
@@ -93,29 +99,48 @@ class HourArchive:
         self.cache = {}
         self.dirty = set()
         self.previous = {}
+        self.legacy = {}
 
     def initialize(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.path) as db:
             db.execute('CREATE TABLE IF NOT EXISTS hours (role TEXT, source TEXT, t REAL, integral REAL, seconds REAL, minimum REAL, maximum REAL, amount REAL, end REAL, counter REAL, PRIMARY KEY(role,source,t))')
             db.execute('CREATE TABLE IF NOT EXISTS imports (source TEXT, day TEXT, PRIMARY KEY(source,day))')
-            db.execute('PRAGMA user_version=1')
+            # Keep V1.0 hourly observations intact. They cannot be split honestly.
+            db.execute('CREATE TABLE IF NOT EXISTS quarters (role TEXT, source TEXT, t REAL, integral REAL, seconds REAL, minimum REAL, maximum REAL, amount REAL, end REAL, counter REAL, PRIMARY KEY(role,source,t))')
+            db.execute('CREATE TABLE IF NOT EXISTS quarter_imports (source TEXT, day TEXT, PRIMARY KEY(source,day))')
+            db.execute('PRAGMA user_version=2')
 
     def bucket(self, source, stamp):
         key = (source.role, source.key, stamp)
         if key not in self.cache:
             with sqlite3.connect(self.path) as db:
-                row = db.execute('SELECT integral,seconds,minimum,maximum,amount,end,counter FROM hours WHERE role=? AND source=? AND t=?', key).fetchone()
+                row = db.execute('SELECT integral,seconds,minimum,maximum,amount,end,counter FROM quarters WHERE role=? AND source=? AND t=?', key).fetchone()
             self.cache[key] = list(row) if row else [0., 0., None, None, 0., stamp, None]
         return key, self.cache[key]
+
+    def legacy_bucket(self, source, stamp, zone):
+        key = (source.role, source.key, hour_start(stamp, zone))
+        if key not in self.legacy:
+            with sqlite3.connect(self.path) as db:
+                self.legacy[key] = db.execute('SELECT end,counter FROM hours WHERE role=? AND source=? AND t=?', key).fetchone()
+        return self.legacy[key]
 
     def interval(self, source, start, end, value, amount, zone, end_value=None):
         """Append only previously unrecorded coverage; rain belongs to interval end."""
         if not end > start:
             return
         while start < end:
-            stamp = hour_start(start, zone)
-            stop = min(stamp + 3600, end)
+            legacy = self.legacy_bucket(source, start, zone)
+            if legacy and start < legacy[0]:
+                # Frozen legacy prefix + new quarters are disjoint, even when
+                # upgrading halfway through an hour or replaying Recorder.
+                start = min(end, legacy[0])
+                if source.kind == 'counter' and legacy[1] is not None and end_value is not None:
+                    amount = max(0, end_value - legacy[1]) if end_value >= legacy[1] else end_value
+                continue
+            stamp = quarter_start(start, zone)
+            stop = min(stamp + BUCKET_SECONDS, end)
             key, row = self.bucket(source, stamp)
             effective = max(start, row[5])
             if stop > effective:
@@ -179,28 +204,34 @@ class HourArchive:
         if not self.dirty:
             return
         with sqlite3.connect(self.path) as db:
-            db.executemany('INSERT OR REPLACE INTO hours VALUES (?,?,?,?,?,?,?,?,?,?)',
+            db.executemany('INSERT OR REPLACE INTO quarters VALUES (?,?,?,?,?,?,?,?,?,?)',
                            [(*key, *self.cache[key]) for key in self.dirty])
         self.dirty.clear()
         # Keep only current/recent buckets cached after historical imports.
         if len(self.cache) > 1000:
             cutoff = datetime.now(UTC).timestamp() - 172800
             self.cache = {key: row for key, row in self.cache.items() if key[2] >= cutoff}
+            self.legacy = {key: row for key, row in self.legacy.items() if key[2] >= cutoff}
 
     def imported(self, source, day):
         with sqlite3.connect(self.path) as db:
-            return db.execute('SELECT 1 FROM imports WHERE source=? AND day=?', (source.key + ':' + source.role, day)).fetchone() is not None
+            return db.execute('SELECT 1 FROM quarter_imports WHERE source=? AND day=?', (source.key + ':' + source.role, day)).fetchone() is not None
 
     def mark_imported(self, source, day):
         with sqlite3.connect(self.path) as db:
-            db.execute('INSERT OR IGNORE INTO imports VALUES (?,?)', (source.key + ':' + source.role, day))
+            db.execute('INSERT OR IGNORE INTO quarter_imports VALUES (?,?)', (source.key + ':' + source.role, day))
 
-    def read(self, source, start, end):
+    def read(self, source, start, end, zone='UTC'):
         self.flush()
         with sqlite3.connect(self.path) as db:
             rows = db.execute('SELECT t,integral,seconds,minimum,maximum,amount,end FROM hours WHERE role=? AND source=? AND t>=? AND t<? ORDER BY t', (source.role, source.key, start, end)).fetchall()
-            first = db.execute('SELECT MIN(t) FROM hours WHERE role=? AND source=?', (source.role, source.key)).fetchone()[0]
-        return rows, first
+            quarters = db.execute('SELECT t,integral,seconds,minimum,maximum,amount,end FROM quarters WHERE role=? AND source=? AND t>=? AND t<? ORDER BY t', (source.role, source.key, start, end)).fetchall()
+            # Shift only the timestamp of a quarter overlapping a legacy prefix;
+            # its integral and coverage already exclude that prefix at write time.
+            legacy_ends = {row[0]: row[6] for row in rows}
+            quarters = [(max(row[0], legacy_ends.get(hour_start(row[0], zone), row[0])), *row[1:]) for row in quarters]
+            first = db.execute('SELECT MIN(t) FROM (SELECT t FROM hours WHERE role=? AND source=? UNION ALL SELECT t FROM quarters WHERE role=? AND source=?)', (source.role, source.key, source.role, source.key)).fetchone()[0]
+        return sorted([(*row, True) for row in rows] + [(*row, False) for row in quarters]), first
 
 
 def period_range(day, scale, zone):
@@ -240,6 +271,27 @@ def recorder_day(hass, start, end, entity_ids):
         return value.replace(tzinfo=UTC).timestamp() if value.tzinfo is None else value.timestamp()
     windows = [(timestamp(a), min(end, timestamp(b) if b else end)) for a, b in records]
     return data, windows
+
+
+def detailed_observations(source, data, windows, start, end, current=None):
+    """All available day states, in canonical units, with explicit outage gaps."""
+    states = list(data.get(source.entity, []))
+    if current is not None and start <= current.last_updated.timestamp() <= end:
+        states.append(current)  # Recorder may not have committed the latest state yet.
+    points = {}
+    for run_start, run_end in sorted(windows):
+        begin, finish = max(start, run_start), min(end, run_end)
+        if finish <= begin:
+            continue
+        if begin > start:
+            points[begin * 1000 - .001] = None
+        for state in sorted(states, key=lambda s: s.last_updated.timestamp()):
+            stamp = state.last_updated.timestamp()
+            if run_start <= stamp <= finish:
+                points[max(begin, stamp) * 1000] = source.value(state)
+        if finish < end:
+            points[finish * 1000] = None
+    return [{'t': stamp, 'value': value} for stamp, value in sorted(points.items())]
 
 
 class ArchiveService:
@@ -290,7 +342,7 @@ class ArchiveService:
 
     async def start(self):
         await self.work(self.store.initialize)
-        # Seed today's history before live sampling, so no same-hour prefixes
+        # Seed today's history before live sampling, so no same-period prefixes
         # can be overwritten or counted twice by the background import.
         try:
             await self.import_day(datetime.now(ZoneInfo(self.zone)).date(), current=True)
@@ -387,6 +439,7 @@ class ArchiveService:
             if not current:
                 for source in definitions:
                     await self.work(self.store.mark_imported, source, day.isoformat())
+        return data, windows
 
     async def backfill(self):
         self.status = 'importing'
@@ -414,6 +467,12 @@ class ArchiveService:
         today = datetime.now(ZoneInfo(self.zone)).date()
         if first > today or first.year < 2000:
             raise ValueError('Invalid history period')
+        detailed = None
+        if source and day == today and scale == 'hour' and 'recorder' in self.hass.config.components:
+            try:
+                detailed = await self.import_day(day, current=True)
+            except Exception:
+                _LOGGER.warning('Current-day weather history unavailable; using durable archive', exc_info=True)
         # Import older detailed days on demand if outside the initial window.
         if source and first < today - timedelta(days=60) and 'recorder' in self.hass.config.components:
             cursor = first
@@ -427,14 +486,30 @@ class ArchiveService:
         self.sample(datetime.now(UTC).timestamp())
         await self.drain()
         async with self.lock:
-            rows, earliest = await self.work(self.store.read, source, start, end) if source else ([], None)
+            rows, earliest = await self.work(self.store.read, source, start, end, self.zone) if source else ([], None)
             gust_source = next((s for s in self.current_sources() if s.role == 'wind_gust'), None)
-            gust_rows = (await self.work(self.store.read, gust_source, start, end))[0] if role == 'wind_speed' and gust_source else []
+            gust_rows = (await self.work(self.store.read, gust_source, start, end, self.zone))[0] if role == 'wind_speed' and gust_source else []
         now = datetime.now(UTC).timestamp()
         points = []
         cursor = start
+        cuts = {start, end}
+        if scale == 'hour':
+            cuts.update(range(int(start), int(end), BUCKET_SECONDS))
+            # Preserve each legacy observation as one honest hourly point.
+            # Gusts share the same bins, so their maxima remain visible.
+            legacy_ranges = sorted((row[0], row[6]) for row in rows + gust_rows if row[7])
+            merged = []
+            for begin, finish in legacy_ranges:
+                if merged and begin < merged[-1][1]:
+                    merged[-1] = (merged[-1][0], max(finish, merged[-1][1]))
+                else:
+                    merged.append((begin, finish))
+            for begin, finish in merged:
+                cuts = {cut for cut in cuts if not begin < cut < finish}
+                cuts.update((begin, finish))
+            edges = sorted(cuts)
         while cursor < end:
-            stop = min(cursor + 3600, end) if scale == 'hour' else boundaries(datetime.fromtimestamp(cursor, ZoneInfo(self.zone)).date() + timedelta(days=1), self.zone)[0]
+            stop = next(edge for edge in edges if edge > cursor) if scale == 'hour' else boundaries(datetime.fromtimestamp(cursor, ZoneInfo(self.zone)).date() + timedelta(days=1), self.zone)[0]
             group = [row for row in rows if cursor <= row[0] < stop]
             expected = max(0, min(stop, now) - cursor)
             item = {'t': cursor * 1000, 'end': stop * 1000, 'ongoing': cursor <= now < stop, **summarize(group, role == 'rain', expected)}
@@ -443,7 +518,16 @@ class ArchiveService:
                 item['gust'] = max(gusts) if gusts else None
             points.append(item)
             cursor = stop
-        return {'role': role, 'scale': scale, 'date': day.isoformat(), 'start': first.isoformat(), 'end': (last - timedelta(days=1)).isoformat(),
+        observations = []
+        gust_observations = []
+        if detailed and role != 'rain':
+            data, windows = detailed
+            observations = detailed_observations(source, data, windows, start, min(end, now), self.hass.states.get(source.entity))
+            if role == 'wind_speed' and gust_source:
+                gust_observations = detailed_observations(gust_source, data, windows, start, min(end, now), self.hass.states.get(gust_source.entity))
+        return {'observations': observations, 'gust_observations': gust_observations,
+                'role': role, 'scale': scale, 'date': day.isoformat(), 'start': first.isoformat(), 'end': (last - timedelta(days=1)).isoformat(),
+                'resolution_minutes': 15, 'legacy_hourly': any(row[7] for row in rows),
                 'points': points, 'summary': summarize(rows, role == 'rain', max(0, min(end, now) - start)),
                 'earliest': datetime.fromtimestamp(earliest, ZoneInfo(self.zone)).date().isoformat() if earliest is not None else None,
                 'today': today.isoformat(), 'import_status': self.status, 'estimated': bool(source and source.kind == 'lux'), 'configured': source is not None}

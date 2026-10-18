@@ -1,30 +1,6 @@
-# Station Météo — v1.0.0
+# Station Météo — v1.1.0
 
-Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo **Ecowitt WS90** et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
-
-### Vue d’ensemble
-
-[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)
-
-### Configuration générale
-
-[![Configuration générale](https://logisub.com/assets/sm-config.jpg?v=0.10.0)](https://logisub.com/assets/sm-config.jpg?v=0.10.0)
-
-### Personnalisations
-
-[![Personnalisations](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)
-
-### Gestion des notifications
-
-[![Gestion des notifications](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)
-
-### Carte des Températures
-
-[![Températures](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)
-
-### Carte Satéllite
-
-[![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
+Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo Ecowitt WS90 et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
 
 ### Vue d’ensemble
 
@@ -50,7 +26,21 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 
 [![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
 
-## Version 1.0.0 — historique durable
+
+## Version 1.1.0
+
+- Précipitations : cumul du jour bleu à droite de la grande valeur, suppression de « Heure en cours », état de pluie conservé dessous et alignement des petits graphiques.
+- Vent : rafales en orange superposées au vent bleu sur la page principale et dans les graphiques du jour, des sept jours et du mois, avec une échelle commune. L’archive conserve les maxima des rafales par période.
+- À chaque ouverture et actualisation du graphique du jour, nouvelle lecture du Recorder depuis minuit pour récupérer les données éventuellement absentes au démarrage. Pour les courbes des capteurs, les relevés détaillés disponibles dans le Recorder s’affichent à leur horodatage exact, en complément de l’archive durable de 15 minutes. Les arrêts de Home Assistant et les états indisponibles interrompent la courbe détaillée. Les données détaillées dépendent de la rétention du Recorder ; l’archive durable reste disponible indépendamment.
+- Les nouvelles observations durables sont conservées par tranches de 15 minutes : moyenne pondérée, minimum, maximum et cumul de pluie. Une journée normale comporte 96 points (92/100 lors des changements d’heure en Europe/Paris).
+- Les graphiques du jour couvrent toute la journée, de minuit à minuit. Les heures futures restent vides. Les échelles 7 jours et mois conservent les agrégations quotidiennes.
+- Migration automatique sans effacement du fichier `station_meteo/history.sqlite3`. Les données horaires V1.0 sont conservées à leur précision d’origine ; elles ne sont pas artificiellement divisées. Les périodes nouvelles ou absentes sont importées depuis les états détaillés encore disponibles dans Recorder. Une reprise en milieu d’heure conserve l’ancienne portion puis ajoute les quarts d’heure suivants, sans doubler les cumuls.
+- Le bouton de menu de la station est masqué sur ordinateur ; il reste disponible sur les écrans étroits.
+- Prévoir environ 50 à 70 Mo par an pour huit séries, en plus des données horaires déjà présentes. Aucune purge automatique de l’archive.
+
+Pour mettre à jour : remplacer `custom_components/station_meteo`, redémarrer Home Assistant puis actualiser complètement le navigateur. Conserver le dossier `/config/station_meteo`, qui contient l’historique et les fichiers personnalisés.
+
+## Nouveautés Version 1.0.0 — historique durable
 
 ### Ajustements de présentation et vigilances
 
@@ -152,7 +142,7 @@ Le changement de date suit le **fuseau Home Assistant** et se détecte lors du r
 
 - Trois boutons supplémentaires : **Humidité**, **Pluies 24H** et **Vent en rafales**, sur la région Météociel `r8` par défaut.
 - Les six boutons sont personnalisables : nom, cible, mode d'ouverture et case Afficher ; réinitialisation indépendante.
-- Le satellite utilise par défaut l'animation Météociel **composition visible MTG/Meteosat12 sur la France**.L'animation GIF originale se lit automatiquement son horaire change sur chaque image.
+- Le satellite utilise par défaut l'animation Météociel **composition visible MTG/Meteosat12 sur la France**. L'animation GIF originale se lit automatiquement ; son horaire change sur chaque image.
 - Les trois nouvelles cartes et le satellite s'affichent seuls, avec un bouton Actualiser et le lien Météociel en bas à droite. Les horodatages et crédits inscrits sur les images sont conservés, sans superposer une heure de téléchargement à l'heure réelle des observations.
 - Les réglages existants sont conservés. Les nouveaux boutons s'ajoutent automatiquement. Le satellite EUMETSAT non personnalisé bascule vers le nouveau défaut Météociel ; un cadrage EUMETSAT personnalisé ou une cible différente reste conservé.
 
@@ -276,7 +266,7 @@ et autres réglages existants sont conservés. Les notifications ajoutées reste
 
 ## Installation manuelle
 
-1. Décompressez `Station-Meteo-v1.0.0.zip` sur votre ordinateur.
+1. Décompressez `Station-Meteo-v1.1.0.zip` sur votre ordinateur.
 2. Copiez le dossier **`custom_components/station_meteo`** dans
    **`/config/custom_components/station_meteo`** sur Home Assistant.
    Le fichier manifest doit être exactement à :

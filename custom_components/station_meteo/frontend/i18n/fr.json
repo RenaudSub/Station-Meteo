@@ -261,7 +261,7 @@
   "history_next": "Période suivante",
   "history_date": "Choisir une date",
   "history_today": "Aujourd’hui",
-  "history_scale_hour": "Heures",
+  "history_scale_hour": "Journée · 15 min",
   "history_scale_week": "7 jours",
   "history_scale_month": "Mois",
   "history_cycle": "Changer d’échelle : Heures → 7 jours → Mois",
@@ -295,5 +295,10 @@
   "vigilance_missing": "Vigilance non vérifiée : consultez le bulletin officiel.",
   "vigilance_received": "Relevé HA reçu le",
   "vigilance_last_received": "Dernier relevé HA reçu le",
-  "vigilance_bulletin": "Bulletin officiel"
+  "vigilance_bulletin": "Bulletin officiel",
+  "history_legacy": "Les anciennes mesures horaires sont conservées à leur précision d’origine.",
+  "history_future": "À venir",
+  "history_value": "Valeur mesurée",
+  "history_detail_legend": "Courbe : relevés détaillés du jour · bande et repères : archive de 15 min",
+  "history_gust_legend": "Orange : rafales maximales par période"
 }

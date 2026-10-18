@@ -53,3 +53,13 @@
 @media(max-width:480px){.sky-foot{grid-template-columns:1fr}}
 @media(max-width:820px){.sky-foot{grid-template-columns:1fr}.sky-foot>div:nth-child(2){border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:10px}}
 .sky-foot>div>small{font-size:11px}.sky-foot strong{font-size:12px}
+
+/* Home Assistant already provides its sidebar menu on desktop. */
+:host .brand .menu{display:none}
+:host([narrow]) .brand .menu{display:inline-flex}
+@media(max-width:870px){:host(:not([ha-layout])) .brand .menu{display:inline-flex}}
+
+.metric-row{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0}.metric-row>.metric{flex-shrink:0}.metric-row>.daily-rain-link{font-size:10px;line-height:1.25;min-height:0;max-width:110px;text-align:right;letter-spacing:0}.metric-row>.daily-rain-link b{white-space:nowrap}.small-measures>.tile{display:flex;flex-direction:column;min-width:0}.small-measures>.tile>.graph-trigger{margin-top:auto}.daily-rain-link{min-height:0}.wind-legend{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;font-size:10px;margin-top:4px}.wind-legend span:first-child{color:#008cff}.wind-legend span:last-child,.archive-gust-label{color:#d77b00}
+@media(max-width:480px){.metric-row>.daily-rain-link{font-size:9px;max-width:75px}.metric-row{gap:4px}}
+
+.archive-has-detail .archive-mean{opacity:.3}
