@@ -4,30 +4,6 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 
 ### Vue d’ensemble
 
-[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)
-
-### Configuration générale
-
-[![Configuration générale](https://logisub.com/assets/sm-config.jpg?v=0.10.0)](https://logisub.com/assets/sm-config.jpg?v=0.10.0)
-
-### Personnalisations
-
-[![Personnalisations](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)
-
-### Gestion des notifications
-
-[![Gestion des notifications](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)
-
-### Carte des Températures
-
-[![Températures](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)
-
-### Carte Satéllite
-
-[![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
-
-### Vue d’ensemble
-
 [![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)
 
 ### Configuration générale
