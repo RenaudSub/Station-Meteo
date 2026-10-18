@@ -1,9 +1,30 @@
 # Station Météo — v1.0.0
 
-Intégration personnalisée Home Assistant avec panneau latéral **Station Météo**.
-Interface inspirée du design validé : bandeau météo, bulletin actuel, rose des vents,
-mesures locales, courbes historiques, prévisions horaires et prévisions de demain.
-Disposition adaptée aux PC, tablettes et smartphones ; français, anglais et espagnol.
+Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo **Ecowitt WS90** et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
+
+### Vue d’ensemble
+
+[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)](https://logisub.com/assets/sm-vue1.jpg?v=0.10.0)
+
+### Configuration générale
+
+[![Configuration générale](https://logisub.com/assets/sm-config.jpg?v=0.10.0)](https://logisub.com/assets/sm-config.jpg?v=0.10.0)
+
+### Personnalisations
+
+[![Personnalisations](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)](https://logisub.com/assets/sm-perso.jpg?v=0.10.0)
+
+### Gestion des notifications
+
+[![Gestion des notifications](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)](https://logisub.com/assets/sm-notif.jpg?v=0.10.0)
+
+### Carte des Températures
+
+[![Températures](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)](https://logisub.com/assets/sm-temp.jpg?v=0.10.0)
+
+### Carte Satéllite
+
+[![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
 
 ### Vue d’ensemble
 
