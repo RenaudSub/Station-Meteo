@@ -13,3 +13,7 @@ const split=archiveSeries([points[0],{value:null},points[1],points[2]],i=>i,v=>v
 assert.deepEqual(archiveSeries([{value:null}],i=>i,v=>v),[]);
 assert.equal(archiveSeries([{value:2}],i=>i,v=>v)[0].mean,'M0,2');
 console.log('Archive smoothing passed: exact mean points, monotone bounds, no overshoot, no bridging missing data, isolated and empty series.');
+
+const straight=archiveSeries(points,i=>i*30,v=>100-v,false);
+assert.match(straight[0].mean,/L/);assert.doesNotMatch(straight[0].mean,/C/);
+assert.match(straight[0].band,/Z$/);assert.equal(points[1].value,30);

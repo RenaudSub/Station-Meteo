@@ -129,7 +129,7 @@ def validate_config(hass, data):
     result["notifications"] = opts
     cards = result["map_buttons"]
     if not isinstance(cards, list) or not len(DEFAULT_MAP_BUTTONS) <= len(cards) <= len(DEFAULT_MAP_BUTTONS) + 5:
-        raise ValueError("Expected six built-in buttons and at most five custom buttons")
+        raise ValueError("Expected all built-in buttons and at most five custom buttons")
     normalized = []
     custom_ids = set()
     for index, card in enumerate(cards):
@@ -262,14 +262,14 @@ async def ws_satellite(hass, connection, msg):
     connection.send_result(msg["id"], await async_satellite(hass, runtime, msg["index"]))
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4))})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4)), vol.Optional("product"): vol.In([1, 2, 3, 4, 5, 6, 7, 15]), vol.Optional("viewport"): {vol.Required("x"): vol.Coerce(float), vol.Required("y"): vol.Coerce(float), vol.Required("zoom"): vol.Coerce(float)}, vol.Optional("options"): {vol.Optional("duration"): vol.In([2, 5, 10, 30, 60, 120]), vol.Optional("cities"): vol.In([0, 1, 2, 3]), vol.Optional("roads"): bool, vol.Optional("rivers"): bool, vol.Optional("relief"): bool}})
 @websocket_api.async_response
 async def ws_meteociel(hass, connection, msg):
     runtime = hass.data.get(DOMAIN, {})
     if not runtime.get("loaded"):
         connection.send_error(msg["id"], "not_loaded", "Station Météo is not loaded")
         return
-    connection.send_result(msg["id"], await async_meteociel(hass, runtime, msg["index"]))
+    connection.send_result(msg["id"], await async_meteociel(hass, runtime, msg["index"], msg.get("options"), msg.get("viewport"), msg.get("product")))
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/almanac"})

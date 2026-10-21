@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 import json
 import math
+import logging
 import re
 from urllib.parse import parse_qs, urlsplit, urljoin, urlunsplit
 from html.parser import HTMLParser
@@ -14,12 +15,15 @@ from html.parser import HTMLParser
 import aiohttp
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+_LOGGER = logging.getLogger(__name__)
+
 RADAR_PAGE = "https://www.meteociel.fr/observations-meteo/radarzoom.php"
 LIGHTNING_PAGE = "https://www.meteociel.fr/observations-meteo/foudre-direct.php"
 STRIKES = "https://www.meteociel.fr/obs/foudre/temps-reel.php"
+ACCUMULATIONS = {5: '5m_', 15: '5m_', 1: '', 3: '12h_', 2: '24h_', 6: '48h_', 7: '72h_', 4: 'clim6z_'}
 
 
-def viewport(url):
+def viewport(url, requested=None):
     """Read the supported source URL and reproduce the original 768px viewport."""
     parsed = urlsplit(url)
     paths = {urlsplit(RADAR_PAGE).path: ("radar", 6742.28, 9941.72, 4, 4),
@@ -29,11 +33,19 @@ def viewport(url):
             or parsed.path not in paths):
         raise ValueError("Native Meteociel mode requires a supported Meteociel map URL")
     kind, x, y, zoom, maximum = paths[parsed.path]
-    params = parse_qs(parsed.query)
+    params = parse_qs(parsed.query, keep_blank_values=True)
     # Other radar products use different palettes and tile paths.
-    if kind == "radar" and any(key in params for key in ("lame", "snow", "reflmf", "expert", "mode", "radar", "antenna")):
-        raise ValueError("Only the standard precipitation radar is supported")
-    values = [float(params.get(key, [default])[0]) for key, default in (("x", x), ("y", y), ("zoom", zoom))]
+    if kind == "radar" and any(key in params for key in ("snow", "reflmf", "expert", "mode", "radar", "antenna", "archive")):
+        raise ValueError("Unsupported radar product")
+    product = 0
+    if kind == "radar" and "lame" in params:
+        if len(params["lame"]) != 1 or params["lame"][0] not in {str(v) for v in ACCUMULATIONS}:
+            raise ValueError("Unsupported accumulation product")
+        product = int(params["lame"][0])
+    if requested is not None:
+        if not isinstance(requested, dict) or set(requested) != {"x", "y", "zoom"} or any(type(v) not in (int, float) for v in requested.values()):
+            raise ValueError("Invalid map navigation")
+    values = [float(requested[key] if requested is not None else params.get(key, [default])[0]) for key, default in (("x", x), ("y", y), ("zoom", zoom))]
     x, y, zoom = values
     extent = 768 * 2 ** maximum
     if not all(math.isfinite(v) for v in values) or not (0 <= x <= extent and 0 <= y <= extent and 0 <= zoom <= maximum):
@@ -43,7 +55,7 @@ def viewport(url):
     left = (extent - 768 / scale) / 2 if extent * scale < 768 else max(0, min(x - 384, extent - 768 / scale))
     top = (extent - 768 / scale) / 2 if extent * scale < 768 else max(0, min(y - 384, extent - 768 / scale))
     return {"kind": kind, "x": left + 384, "y": top + 384, "left": left, "top": top,
-            "zoom": zoom, "maximum": maximum, "scale": scale}
+            "zoom": zoom, "maximum": maximum, "scale": scale, "product": product}
 
 
 def tile_plan(view):
@@ -74,7 +86,41 @@ def radar_metadata(html, now=None):
     return {"times": [value.isoformat() for value in times], "palette": palette}
 
 
-def projected_points(items, view, multiplier=64):
+def accumulation_metadata(html, product, now=None):
+    """Read observed accumulations and declared PIAF forecast frames, never JS."""
+    now = now or datetime.now(timezone.utc)
+    content = radar_metadata(html, now)
+    dates = dict(re.findall(r'radardate2\[(\d+)\]\s*=\s*["\'](\d{4}|\d{12})["\']', html))
+    folders = dict(re.findall(r'radardate\[(\d+)\]\s*=\s*["\']([0-9/]+)["\']', html))
+    match = re.search(r'var\s+piafFirstEch\s*=\s*(\d+)', html)
+    forecast_index = int(match[1]) if match and product == 15 else 9999
+    specs, previous = [], None
+    for index in sorted(dates, key=int)[:96]:
+        token, folder = dates[index], folders.get(index, '')
+        forecast = int(index) >= forecast_index
+        if not forecast:
+            if len(token) != 12:
+                continue
+            time = datetime.strptime(token, '%Y%m%d%H%M').replace(tzinfo=timezone.utc)
+            if time > now or folder != time.strftime('%Y/%m/%d'):
+                continue
+        else:
+            if previous is None or len(token) != 4 or not re.fullmatch(r'\d{1,6}', folder):
+                continue
+            time = previous.replace(hour=int(token[:2]), minute=int(token[2:]))
+            if time <= previous:
+                time += timedelta(days=1)
+            if (time-datetime.fromisoformat(content['times'][-1])).total_seconds() > 3*3600:
+                continue
+        previous = time
+        specs.append({'time': time.isoformat(), 'token': token, 'folder': folder, 'forecast': forecast})
+    if not specs:
+        raise ValueError('No declared accumulation frames')
+    content['frame_specs'] = specs
+    return content
+
+
+def projected_points(items, view, multiplier=64, minutes=30):
     result = []
     for item in items[:100000]:
         try:
@@ -82,8 +128,8 @@ def projected_points(items, view, multiplier=64):
             age = float(item.get("d", 0))
         except (TypeError, ValueError, KeyError):
             continue
-        if all(math.isfinite(v) for v in (x, y, age)) and -5 <= x <= 773 and -5 <= y <= 773 and 0 <= age <= 1800:
-            result.append({"x": x, "y": y, "age": age})
+        if all(math.isfinite(v) for v in (x, y, age)) and -5 <= x <= 773 and -5 <= y <= 773 and 0 <= age <= minutes * 60:
+            result.append({"x": x, "y": y, "age": age, "id": str(item.get("_id", ""))[:100]})
     return result
 
 
@@ -91,7 +137,7 @@ async def read_source(session, url, params=None):
     """Bounded trusted metadata request; redirect responses are not followed."""
     async with session.get(url, params=params, allow_redirects=False, timeout=aiohttp.ClientTimeout(total=20), headers={"Cache-Control": "no-cache"}) as response:
         if response.status != 200:
-            raise ValueError("Meteociel source unavailable")
+            raise ValueError(f"Meteociel source unavailable (HTTP {response.status})")
         chunks, size = [], 0
         async for chunk in response.content.iter_chunked(32768):
             size += len(chunk)
@@ -101,19 +147,22 @@ async def read_source(session, url, params=None):
         return b"".join(chunks).decode("utf-8", errors="replace")
 
 
-async def city_labels(session, view):
+async def city_labels(session, view, density=None):
     lightning = view["kind"] == "lightning"
+    if density == 0:
+        return []
+    limit = {1: 20000, 2: 5000, 3: 0}.get(density, 60)
     url = ("https://static.meteociel.fr/test/foudretiles/europe/getcities.php" if lightning
            else "https://modeles7.meteociel.fr/modeles/arome/tiles/getcities.php")
     try:
-        data = json.loads(await read_source(session, url, {"zoom": view["zoom"], "offsetx": view["x"], "offsety": view["y"], "width": 768, "height": 768, "limit": 60, "size": 11}))
+        data = json.loads(await read_source(session, url, {"zoom": view["zoom"], "offsetx": view["x"], "offsety": view["y"], "width": 768, "height": 768, "limit": limit, "size": 11}))
         labels = []
-        for city in data[:1000]:
+        for city in data[:10000]:
             x = (float(city["x"]) * (64 if lightning else 16) - view["left"]) * view["scale"]
             y = (float(city["y"]) * (64 if lightning else 16) - view["top"]) * view["scale"]
             if math.isfinite(x) and math.isfinite(y) and -30 <= x <= 768 and 0 <= y <= 768:
                 labels.append({"x": x, "y": y, "name": str(city["n"])[:80]})
-        return labels[:60]
+        return labels[:10000]
     except (aiohttp.ClientError, TimeoutError, ValueError, TypeError, KeyError):
         return []
 
@@ -227,7 +276,71 @@ async def async_image_map(session, runtime, card, spec):
 
 
 
-async def async_meteociel(hass, runtime, index):
+def lightning_options(options=None):
+    defaults = {'duration': 30, 'cities': 1, 'roads': False, 'rivers': True, 'relief': False}
+    if options is None:
+        return defaults
+    if not isinstance(options, dict) or set(options) - set(defaults):
+        raise ValueError('Invalid lightning options')
+    values = {**defaults, **options}
+    if type(values['duration']) is not int or values['duration'] not in (2, 5, 10, 30, 60, 120):
+        raise ValueError('Invalid lightning duration')
+    if type(values['cities']) is not int or values['cities'] not in (0, 1, 2, 3):
+        raise ValueError('Invalid city density')
+    if any(type(values[k]) is not bool for k in ('roads', 'rivers', 'relief')):
+        raise ValueError('Invalid lightning layer')
+    return values
+
+
+async def lightning_snapshot(session, cached, now, minutes):
+    """Follow the upstream incremental cursor; stable IDs prevent repeated sounds."""
+    last = cached['content'].get('last') if cached else None
+    if last == '0':
+        last = None
+    params = {'last': last} if last else {'first': 1, 'duree': minutes}
+    params.update(region='fr', dontwait=1, modeloc=1)
+    reset = False
+    try:
+        text = await read_source(session, STRIKES, params)
+        data = {'items': [], 'last': last or '0'} if text.strip() == 'NO' else json.loads(text)
+        if not isinstance(data, dict) or not isinstance(data.get('items'), list):
+            raise ValueError('Invalid lightning observations')
+        cursor = str(data.get('last', '')).strip()
+        if not re.fullmatch(r'[0-9]{1,32}', cursor):
+            raise ValueError('Invalid lightning cursor')
+    except (ValueError, aiohttp.ClientError, TimeoutError):
+        if not last:
+            raise
+        # A cursor may expire or the upstream feed may restart. Reopen the
+        # selected history window once instead of retrying a broken cursor forever.
+        text = await read_source(session, STRIKES, {'first': 1, 'duree': minutes, 'region': 'fr', 'dontwait': 1, 'modeloc': 1})
+        data = {'items': [], 'last': '0'} if text.strip() == 'NO' else json.loads(text)
+        if not isinstance(data, dict) or not isinstance(data.get('items'), list):
+            raise ValueError('Invalid lightning observations')
+        cursor = str(data.get('last', '')).strip()
+        if not re.fullmatch(r'[0-9]{1,32}', cursor):
+            raise ValueError('Invalid lightning cursor')
+        cached, last, reset = None, None, True
+    items = []
+    if cached and last:
+        elapsed = max(0, (now-cached['at']).total_seconds())
+        for item in cached['content']['items']:
+            try:
+                age = float(item['d'])+elapsed
+            except (TypeError, ValueError, KeyError):
+                continue
+            if math.isfinite(age) and 0 <= age <= minutes*60:
+                items.append({**item, 'd': age})
+    # The cursor identifies each upstream batch. Retain IDs across subsequent
+    # refreshes and layer/city changes, instead of comparing moving ages.
+    if not cached or cursor != last:
+        for index, item in enumerate(data['items'][:100000]):
+            if isinstance(item, dict):
+                items.append({**item, '_id': f'{cursor}:{index}'})
+    return {'items': items[-100000:], 'last': cursor, 'time': now.isoformat(), 'reset': reset}
+
+
+async def async_meteociel(hass, runtime, index, options=None, requested_view=None, product=None):
     """Get the latest observations when opened/refreshed, with a short shared cache."""
     if not 0 <= index < len(runtime["config"]["map_buttons"]):
         return {"frames": [], "error": "disabled"}
@@ -236,6 +349,16 @@ async def async_meteociel(hass, runtime, index):
         return {"frames": [], "error": "disabled"}
     try:
         view = source_spec(card["url"])
+        if requested_view is not None:
+            view = viewport(card["url"], requested_view)
+        selected = view.get('product', 0)
+        if product is not None:
+            if view['kind'] != 'radar' or type(product) is not int or product not in ACCUMULATIONS:
+                raise ValueError('Unsupported accumulation product')
+            selected = product
+        if view["kind"] == "radar":
+            view = {**view, "product": selected}
+        settings = lightning_options({"cities": 3, "roads": True, "rivers": True, "relief": True, **(options or {})} if view["kind"] == "radar" else options)
         if view["kind"] in ("humidity", "rain24", "gusts", "satellite", "radar_animation"):
             return await async_image_map(async_get_clientsession(hass), runtime, card, view)
         plan = tile_plan(view)
@@ -243,42 +366,56 @@ async def async_meteociel(hass, runtime, index):
         session = async_get_clientsession(hass)
         async with runtime.setdefault("meteociel_lock", asyncio.Lock()):
             cache = runtime.setdefault("meteociel_cache", {})
-            cached = cache.get(view["kind"])
+            key = ('lightning', settings['duration']) if view['kind'] == 'lightning' else ('radar', selected) if selected else view['kind']
+            cached = cache.get(key)
             if not cached or (now - cached["at"]).total_seconds() > (30 if view["kind"] == "lightning" else 60):
                 if view["kind"] == "radar":
-                    content = radar_metadata(await read_source(session, RADAR_PAGE), now)
+                    if selected:
+                        content = accumulation_metadata(await read_source(session, RADAR_PAGE, {'lame': selected}), selected, now)
+                    else:
+                        content = radar_metadata(await read_source(session, RADAR_PAGE), now)
                 else:
-                    data = json.loads(await read_source(session, STRIKES, {"first": 1, "duree": 30, "region": "fr", "dontwait": 1, "modeloc": 1}))
-                    if not isinstance(data, dict) or not isinstance(data.get("items"), list):
-                        raise ValueError("Invalid lightning observations")
-                    content = {"items": data["items"], "time": now.isoformat()}
+                    content = await lightning_snapshot(session, cached, now, settings['duration'])
                 cached = {"at": now, "content": content}
-                cache[view["kind"]] = cached
+                cache[key] = cached
         content = cached["content"]
         frames, backgrounds = [], []
         lightning = view["kind"] == "lightning"
         for tile in plan:
+            # The radar viewer omits the overlay entirely for mask 000;
+            # that file does not exist on the upstream tile server.
+            if not lightning and not any(settings[key] for key in ("roads", "rivers", "relief")):
+                continue
             level, x, y = tile["level"], tile["x"], tile["y"]
-            url = (f"https://static.meteociel.fr/test/foudretiles/europe2/010_{level}_{x}_{y}.png" if lightning
-                   else f"https://modeles14.meteociel.fr/test/arometiles/roads/111_{level}_{x}_{y}.png")
+            url = (f"https://static.meteociel.fr/test/foudretiles/europe2/{int(settings['relief'])}{int(settings['rivers'])}{int(settings['roads'])}_{level}_{x}_{y}.png" if lightning
+                   else f"https://modeles14.meteociel.fr/test/arometiles/roads/{int(settings['relief'])}{int(settings['rivers'])}{int(settings['roads'])}_{level}_{x}_{y}.png")
             backgrounds.append({"url": url, "rect": tile["rect"]})
         if lightning:
             time = content["time"]
-            frames.append({"time": time, "tiles": [], "points": projected_points(content["items"], view)})
-            start = (datetime.fromisoformat(time) - timedelta(minutes=30)).isoformat()
-            credit = "Météociel / Blitzortung — 30 min"
+            frames.append({"time": time, "tiles": [], "points": projected_points(content["items"], view, minutes=settings["duration"])})
+            start = (datetime.fromisoformat(time) - timedelta(minutes=settings["duration"])).isoformat()
+            credit = f"Météociel / Blitzortung — {settings['duration']} min"
         else:
-            for time in content["times"]:
+            for spec in content.get('frame_specs', [{'time': time, 'forecast': False} for time in content['times']]):
+                time = spec['time']
                 value = datetime.fromisoformat(time)
-                prefix = f'https://modeles14.meteociel.fr/radar/tiles/{value:%Y/%m/%d}'
-                frames.append({"time": time, "tiles": [{"url": f'{prefix}/{tile["level"] + 1}/{value:%Y%m%d%H%M}-{tile["x"]}-{tile["y"]}.png', "rect": tile["rect"]} for tile in plan]})
+                folder = spec.get('folder', value.strftime('%Y/%m/%d'))
+                prefix = f'https://modeles14.meteociel.fr/radar/{"tilespiaf" if spec["forecast"] else "tileslame" if selected else "tiles"}/{folder}'
+                token = spec.get('token', value.strftime('%Y%m%d%H%M'))
+                token = (ACCUMULATIONS[selected] if selected and not spec['forecast'] else '') + token
+                frames.append({"time": time, "forecast": spec['forecast'], "tiles": [{"url": f'{prefix}/{tile["level"] + 1}/{token}-{tile["x"]}-{tile["y"]}.png', "rect": tile["rect"]} for tile in plan]})
             start = None
             credit = "Météociel — données Météo-France"
-        labels = await city_labels(session, view)
-        latest = datetime.fromisoformat(frames[-1]["time"])
-        return {"kind": view["kind"], "frames": frames, "backgrounds": backgrounds, "labels": labels,
+        labels = await city_labels(session, view, settings["cities"])
+        latest = datetime.fromisoformat(content['times'][-1] if view['kind'] == 'radar' else frames[-1]['time'])
+        return {"kind": view["kind"], "viewport": view, "frames": frames, "backgrounds": backgrounds, "labels": labels,
+                "product": selected, "unit": 'mm' if selected else 'mm/h',
                 "palette": content.get("palette", []), "start": start,
+                "duration": settings["duration"] if lightning else None,
+                "reset": bool(lightning and content.get('reset')),
                 "stale": (now - latest).total_seconds() > (300 if lightning else 3600),
                 "source": card["url"], "credit": credit}
-    except (aiohttp.ClientError, TimeoutError, ValueError, TypeError, KeyError, OverflowError):
-        return {"frames": [], "error": "unavailable", "source": card["url"]}
+    except (aiohttp.ClientError, TimeoutError, ValueError, TypeError, KeyError, OverflowError) as error:
+        _LOGGER.warning('Meteociel map unavailable: %s: %s', type(error).__name__, error)
+        status = re.search(r'HTTP ([0-9]{3})', str(error))
+        return {"frames": [], "error": "unavailable", "reason": 'http_'+status[1] if status else 'timeout' if isinstance(error, TimeoutError) else 'network' if isinstance(error, aiohttp.ClientError) else 'source', "source": card["url"]}

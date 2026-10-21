@@ -42,7 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await panel_custom.async_register_panel(
         hass, frontend_url_path=PANEL_PATH, webcomponent_name="station-meteo-panel",
         sidebar_title="Station Météo", sidebar_icon="mdi:weather-partly-cloudy",
-        module_url=f"/{DOMAIN}/frontend/station-meteo.js?v={VERSION}&build=2",
+        module_url=f"/{DOMAIN}/frontend/station-meteo.js?v={VERSION}&build=1",
         require_admin=False, config={"version": VERSION},
     )
     runtime["notifications_manager"] = NotificationManager(hass, runtime)

@@ -1,10 +1,10 @@
-# Station Météo — v1.1.0
+# Station Météo — v1.3.0
 
 Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo Ecowitt WS90 et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
 
 ### Vue d’ensemble
 
-[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)
+[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.2.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.2.0)
 
 ### Configuration générale
 
@@ -26,12 +26,69 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 
 [![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
 
+## Version 1.3.0 — Cumuls et commandes compactes
 
-## Version 1.1.0
+Le nouveau bouton **Cumuls**, personnalisable et masquable, ouvre les lames d'eau radar au cadrage `x=5764.4`, `y=9054.2`, `zoom=2.5`. Le menu placé dans le titre, à côté d'**Actualiser**, propose huit produits : **5 min**, **5 min + Prévision**, **3 h**, **12 h**, **24 h**, **48 h**, **72 h** et **depuis 6 h UTC**. La légende est exprimée en **mm**. Les prévisions ont un horodatage explicitement marqué **Prévision du**. Chaque produit charge ses propres images et sa palette ; le produit combiné inclut les images de prévision déclarées par Météociel.
+
+La lecture démarre automatiquement. Les commandes lecture/pause, le curseur temporel, l'actualisation, les villes et les couches, le zoom et le déplacement restent disponibles. Changer de produit conserve le cadrage et l'état lecture/pause. Le menu ne modifie pas l'URL enregistrée dans la personnalisation ; à la prochaine ouverture, le produit de cette URL est rétabli.
+
+Les boutons **+ / − / Cadrage initial** sont regroupés à droite des réglages des villes et des informations. La phrase d'aide a été retirée. La taille de la carte s'adapte à l'espace vertical disponible pour garder la lecture et le curseur visibles, notamment sur tablette. Les réglages des huit boutons et les cinq cartes personnalisées sont conservés.
+
+Après remplacement du composant, redémarrer Home Assistant et actualiser la page avec **Ctrl+F5**.
+
+## Navigation des cartes et radar pluie/neige — V1.2.0
+
+Les boutons portent désormais les noms **Impacts de foudre** et **Radar Pluie/Neige**. La cible par défaut de ce dernier est `https://www.meteociel.fr/observations-meteo/radar2.php?region=so&mode=1`. Une cible personnalisée reste conservée.
+
+Les cartes natives **Impacts de foudre** et **Précipitations** permettent de naviguer : glisser avec la souris ou un doigt pour déplacer, molette, double-clic, pincement à deux doigts ou boutons **+ / −** pour zoomer. Les tuiles et observations sont rechargées pour le nouveau cadrage. **Cadrage initial** revient à la vue de l'URL du bouton. Actualiser conserve le cadrage courant ; fermer et rouvrir retrouve la vue de l'URL. L'animation radar reprend après la navigation si elle était en lecture. Les impacts déjà présents ne sont pas rejoués au son lors d'un déplacement.
+
+La carte régionale pluie/neige `radar2.php` reste une image animée fournie par le site. La navigation concerne les cartes à tuiles `foudre-direct.php` et `radarzoom.php`.
+
+## Carte animée Précipitations — V1.2.0
+
+Un septième bouton **Précipitations** ouvre le radar Météociel au cadrage demandé (`x=6637.38`, `y=10025.69`, `zoom=3.9`). Les douze images récentes sont chargées puis défilent automatiquement, avec horodatage et légende en mm/h. Lecture/pause et curseur permettent de parcourir les images. Actualiser recharge les observations récentes et conserve l'état lecture/pause.
+
+Les réglages **Villes : Aucune / Un peu / Beaucoup / Toutes** et **Routes / Cours d’eau / Relief** sont mémorisés pour chaque bouton sur l'appareil. Ces commandes sont aussi disponibles pour les autres boutons utilisant `radarzoom.php`. Le radar n'affiche ni réglage de durée des impacts ni commande sonore. Fermer la fenêtre arrête l'animation.
+
+Le bouton est personnalisable et peut être masqué dans **Personnalisation**. Les six boutons précédents, leurs réglages et les cinq cartes personnalisées éventuelles sont conservés lors de la mise à jour. Après remplacement du composant : redémarrer Home Assistant et actualiser la page avec Ctrl+F5.
+
+## Reprise du chargement de la carte Foudre — V1.2.0
+
+La fenêtre sait désormais réessayer l’ancien format de commande si Home Assistant utilise encore la version antérieure du service de carte. Le fond est alors rétabli avec les anciens réglages sur 30 minutes, et un message demande le redémarrage complet de Home Assistant pour activer les nouvelles commandes. Les choix locaux ne sont pas effacés.
+
+Un flux incrémental expiré ou invalide est resynchronisé une fois sur la durée sélectionnée ; les impacts historiques ainsi rechargés ne déclenchent pas de nouveaux sons. Si le chargement échoue, l’interface distingue les erreurs HTTP, les délais dépassés, l’accès réseau depuis Home Assistant et le chargement du fond dans le navigateur. Le détail de l’erreur côté intégration est écrit dans les journaux Home Assistant. Une erreur de source ne devient jamais une carte indiquant faussement zéro impact.
+
+## Réglages des graphiques et carte Foudre — V1.2.0
+
+Dans les graphiques agrandis, sauf les précipitations, deux cases suivent la date : **Afficher les points** et **Adoucir la courbe**. Chaque graphique mémorise ses deux choix localement dans le navigateur de l’appareil. Les choix sont indépendants des autres appareils et ne modifient ni les mesures ni l’archive. Désactiver l’adoucissement relie les mêmes valeurs par des segments droits. Les infobulles restent disponibles quand les points sont masqués. Le vent garde par défaut ses courbes seules, adoucies.
+
+La carte Foudre native propose les fenêtres de **2, 5, 10, 30, 60 et 120 minutes**, les villes **Aucune / Un peu / Beaucoup / Toutes**, et les couches **Routes / Cours d’eau / Relief**. Les couches et seuils des villes reprennent les paramètres des tuiles Météociel. Ces réglages sont mémorisés localement pour chaque bouton de carte Foudre. Le cadrage reste celui de l’URL personnalisée du bouton.
+
+La carte s’actualise toutes les 30 secondes tant qu’elle est ouverte. L’horodatage, la légende et les crédits indiquent la durée sélectionnée. **Jouer un son par nouvel impact** s’active volontairement à chaque ouverture : seuls les nouveaux impacts visibles émettent un son, sans rejouer les impacts historiques lors d’une actualisation ou d’un changement de durée. Les sons et l’actualisation s’arrêtent à la fermeture. Aucun script du site distant n’est exécuté : les données et tuiles publiques sont utilisées directement. La source reste liée en bas à droite de la carte.
+
+## Version 1.2.0 — courbes du vent lisibles
+
+- Petit graphique du vent : une valeur par tranche de 15 minutes, moyenne pondérée par la durée en bleu et rafale maximale en orange. Les courbes sont adoucies sans dépassement des valeurs, sans remplissage, et les périodes sans données restent des coupures.
+- Historique du vent : suppression de la superposition des relevés bruts qui produisait un effet de peigne. Une seule courbe orange des rafales maximales est affichée, avec la courbe bleue du vent moyen. Cela s’applique aux vues jour, semaine et mois. L’infobulle indique la moyenne, les minimums et maximums de la période ainsi que la rafale maximale.
+- Humidité : marge portée à minimum −50 et maximum +50 points, avec bornes habituelles de 0 à 100 %. Cette marge s’applique au petit graphique et aux historiques.
+- Les changements concernent l’affichage. Les calculs, maxima et données de l’archive durable restent conservés. Aucun effacement ni changement du format de stockage.
+
+### Historique des ajustements de la V1.1.0
+
+### Lisibilité des graphiques (version maintenue à 1.1.0)
+
+Les échelles des courbes utilisent une marge fixe autour des extrema, pour éviter qu’une variation de quelques dixièmes occupe toute la hauteur : température ±10 °C, humidité ±10 points, pression ±10 hPa, UV ±2, rayonnement solaire ±100 W/m² et vent ±10 km/h (marge convertie en m/s si cette unité est choisie). Les mêmes marges s’appliquent aux petits tracés et aux vues jour, semaine et mois. L’humidité reste entre 0 et 100 % et les autres mesures positives ne descendent pas sous zéro, sauf si le capteur fournit lui-même une valeur hors limites, conservée visible. Les axes tiennent compte des relevés détaillés et des rafales, sans modifier les mesures ni les calculs.
+
+Les graphiques du vent présentent seulement les courbes : vitesse en bleu, rafales en orange, sans bande remplie. Les histogrammes de précipitations conservent leur échelle et leur présentation.
+
+### Corrections complémentaires (version maintenue à 1.1.0)
 
 - Précipitations : cumul du jour bleu à droite de la grande valeur, suppression de « Heure en cours », état de pluie conservé dessous et alignement des petits graphiques.
 - Vent : rafales en orange superposées au vent bleu sur la page principale et dans les graphiques du jour, des sept jours et du mois, avec une échelle commune. L’archive conserve les maxima des rafales par période.
 - À chaque ouverture et actualisation du graphique du jour, nouvelle lecture du Recorder depuis minuit pour récupérer les données éventuellement absentes au démarrage. Pour les courbes des capteurs, les relevés détaillés disponibles dans le Recorder s’affichent à leur horodatage exact, en complément de l’archive durable de 15 minutes. Les arrêts de Home Assistant et les états indisponibles interrompent la courbe détaillée. Les données détaillées dépendent de la rétention du Recorder ; l’archive durable reste disponible indépendamment.
+
+## Version 1.1.0 — historique toutes les 15 minutes
+
 - Les nouvelles observations durables sont conservées par tranches de 15 minutes : moyenne pondérée, minimum, maximum et cumul de pluie. Une journée normale comporte 96 points (92/100 lors des changements d’heure en Europe/Paris).
 - Les graphiques du jour couvrent toute la journée, de minuit à minuit. Les heures futures restent vides. Les échelles 7 jours et mois conservent les agrégations quotidiennes.
 - Migration automatique sans effacement du fichier `station_meteo/history.sqlite3`. Les données horaires V1.0 sont conservées à leur précision d’origine ; elles ne sont pas artificiellement divisées. Les périodes nouvelles ou absentes sont importées depuis les états détaillés encore disponibles dans Recorder. Une reprise en milieu d’heure conserve l’ancienne portion puis ajoute les quarts d’heure suivants, sans doubler les cumuls.
@@ -39,6 +96,12 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 - Prévoir environ 50 à 70 Mo par an pour huit séries, en plus des données horaires déjà présentes. Aucune purge automatique de l’archive.
 
 Pour mettre à jour : remplacer `custom_components/station_meteo`, redémarrer Home Assistant puis actualiser complètement le navigateur. Conserver le dossier `/config/station_meteo`, qui contient l’historique et les fichiers personnalisés.
+
+
+Intégration personnalisée Home Assistant avec panneau latéral **Station Météo**.
+Interface inspirée du design validé : bandeau météo, bulletin actuel, rose des vents,
+mesures locales, courbes historiques, prévisions horaires et prévisions de demain.
+Disposition adaptée aux PC, tablettes et smartphones ; français, anglais et espagnol.
 
 ## Nouveautés Version 1.0.0 — historique durable
 
