@@ -90,6 +90,8 @@ def validate_config(hass, data):
         validate_image_url(url)
     if result["language"] not in ("auto", "fr", "en", "es"):
         raise ValueError("Invalid language")
+    if result["theme"] not in ("auto", "light", "dark"):
+        raise ValueError("Invalid theme")
     if result["wind_unit"] not in ("km/h", "m/s"):
         raise ValueError("Invalid wind unit")
     if result["pressure_mode"] not in ("absolute", "sea_level"):

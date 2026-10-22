@@ -74,7 +74,7 @@ async def test_panel_catalog_storage_and_permissions(tmp_path):
         assert await async_setup_entry(hass,entry)
         assert len(paths)==2  # reload never duplicates static routes
         assert await hass.data['station_meteo']['store'].async_load()==valid
-        for bad in [{'background_url':'javascript:alert(1)'},{'background_url':'http://example.com/image.jpg'},{'background_url':'/local/../api/config'}, {'language':'xx'},{'altitude':float('nan')},{'entities':{'temperature':'weather.foo'}},{'entities':{'oops':'sensor.x'}}]:
+        for bad in [{'background_url':'javascript:alert(1)'},{'background_url':'http://example.com/image.jpg'},{'background_url':'/local/../api/config'}, {'language':'xx'},{'theme':'xx'},{'altitude':float('nan')},{'entities':{'temperature':'weather.foo'}},{'entities':{'oops':'sensor.x'}}]:
             with pytest.raises(ValueError):validate_config(hass,{**DEFAULT_CONFIG,**bad})
     finally:
         await hass.async_stop(force=True)

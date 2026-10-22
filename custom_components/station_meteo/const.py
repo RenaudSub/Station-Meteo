@@ -21,7 +21,7 @@ DEFAULT_MAP_BUTTONS = [
 DEFAULT_CONFIG = {
     "map_buttons": DEFAULT_MAP_BUTTONS,
     "latitude": None, "longitude": None, "ephemeride_enabled": True,
-    "compass_url": "", "arrow_url": "", "weather_icons": {}, "background_url": "", "location": "Casefabre", "altitude": 247, "language": "auto",
+    "compass_url": "", "arrow_url": "", "weather_icons": {}, "background_url": "", "location": "Casefabre", "altitude": 247, "language": "auto", "theme": "auto",
     "wind_unit": "km/h", "pressure_mode": "absolute", "lux_factor": 126.7,
     "notifications": DEFAULT_NOTIFICATIONS, "estimate_irradiance": False, "entities": {}, "device_id": "",
 }
