@@ -1,6 +1,6 @@
-import {gaugeScale} from './graph-scale.js?v=1.3.0';
-import {archiveSeries} from './archive-series.js?v=1.3.0';
-import {rainScale} from './rain-history.js?v=1.3.0';
+import {gaugeScale} from './graph-scale.js?v=1.4.0-r2';
+import {archiveSeries} from './archive-series.js?v=1.4.0-r2';
+import {rainScale} from './rain-history.js?v=1.4.0-r2';
 /* Durable archive dialog. Dates are local calendar dates; timestamps are UTC. */
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dayDate=s=>new Date(s+'T12:00:00Z');

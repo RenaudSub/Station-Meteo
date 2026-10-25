@@ -1,12 +1,12 @@
 """Station Météo constants."""
 DOMAIN = "station_meteo"
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 WEATHER_CONDITIONS = ("sunny", "clear-night", "partlycloudy", "cloudy", "rainy", "pouring", "snowy", "snowy-rainy", "lightning", "lightning-rainy", "fog", "windy", "windy-variant", "hail", "exceptional")
 PANEL_PATH = "station-meteo"
 ROLES = ("temperature", "humidity", "pressure", "illuminance", "irradiance", "uv", "wind_speed", "wind_gust", "wind_direction", "rain_total", "rain_rate", "rain_status", "dew_point", "battery", "signal", "weather", "weather_fallback", "bulletin", "weather_alert")
 DEFAULT_NOTIFICATIONS = {
     "enabled": False, "recipients": [], "pressure": True, "pressure_drop": 3,
-    "rain": True, "gust": False, "gust_threshold": 60, "storm": True, "cooldown": 60,
+    "rain": True, "gust": False, "gust_threshold": 60, "storm": True, "vigilance": False, "cooldown": 60,
 }
 DEFAULT_MAP_BUTTONS = [
     {"id": "lightning", "name": "", "enabled": True, "mode": "meteociel", "url": "https://www.meteociel.fr/observations-meteo/foudre-direct.php?x=21246.45&y=35533.4&zoom=5.9", "latitude": None, "longitude": None, "zoom": 4},
@@ -20,6 +20,7 @@ DEFAULT_MAP_BUTTONS = [
 ]
 DEFAULT_CONFIG = {
     "map_buttons": DEFAULT_MAP_BUTTONS,
+    "theme": "light", "theme_dark_start": "20:00", "theme_dark_end": "08:00",
     "latitude": None, "longitude": None, "ephemeride_enabled": True,
     "compass_url": "", "arrow_url": "", "weather_icons": {}, "background_url": "", "location": "Casefabre", "altitude": 247, "language": "auto",
     "wind_unit": "km/h", "pressure_mode": "absolute", "lux_factor": 126.7,

@@ -342,5 +342,17 @@
   "accumulation_6": "48 h accumulation",
   "accumulation_7": "72 h accumulation",
   "accumulation_4": "Since 06 UTC",
-  "map_forecast_time": "Forecast for"
+  "map_forecast_time": "Forecast for",
+  "theme": "Theme",
+  "theme_mode": "Appearance",
+  "theme_light": "Light (default)",
+  "theme_dark": "Dark",
+  "theme_auto": "Automatic (Home Assistant)",
+  "theme_schedule": "Scheduled",
+  "theme_dark_start": "Switch to dark at",
+  "theme_dark_end": "Return to light at",
+  "theme_schedule_help": "Times use the Home Assistant time zone:",
+  "notify_vigilance": "Météo-France vigilance changes",
+  "notify_vigilance_help": "Notifies increases, decreases and phenomenon changes from the configured vigilance sensor. The first reading establishes the baseline. Vigilance changes bypass the cooldown for other alerts.",
+  "alert_vigilance": "Météo-France vigilance{department} changed: {change}. {phenomena}"
 }

@@ -51,12 +51,13 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
    await page.waitForFunction(z=>qaPanel._mapRenderedView.zoom>z+.5,before.zoom);await ready();
    assert(await p.locator('.map-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
    await p.locator('.map-dialog').screenshot({path:`/tmp/navigation120-${index}-mobile.png`});
-   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>qaPanel._mapNavigationTimer),null);
+   const remembered=await page.evaluate(()=>({...qaPanel._mapView}));await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>qaPanel._mapNavigationTimer),null);
    assert.equal(await page.evaluate(()=>qaPanel._mapNavigationCleanup),null);
    await page.setViewportSize({width:1536,height:1100});
    await p.locator(`.map-buttons [data-map-index="${index}"]`).click();await ready();
-   assert.equal(await page.evaluate(()=>qaPanel._mapView.x),initial.x);
-   assert.equal(await page.evaluate(()=>qaPanel._mapView.zoom),initial.zoom);
+   assert.equal(await page.evaluate(()=>qaPanel._mapView.x),remembered.x);
+   assert.equal(await page.evaluate(()=>qaPanel._mapView.zoom),remembered.zoom);
+   await p.locator('[data-action="map-reset-view"]').click();await page.waitForFunction(x=>qaPanel._mapRenderedView.x===x,initial.x);
    await page.keyboard.press('Escape');
   }
   assert.deepEqual(errors,[]);

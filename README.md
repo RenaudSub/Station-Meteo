@@ -1,10 +1,10 @@
-# Station Météo — v1.3.0
+# Station Météo — v1.4.0
 
 Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo Ecowitt WS90 et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
 
 ### Vue d’ensemble
 
-[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.2.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.2.0)
+[![Vue d’ensemble](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)](https://logisub.com/assets/sm-vue1.jpg?v=1.0.0)
 
 ### Configuration générale
 
@@ -25,6 +25,22 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 ### Carte Satéllite
 
 [![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
+
+## Version 1.4.0 — Cadrages mémorisés, thèmes et vigilance
+
+Les cartes **Impacts de foudre**, **Précipitations** et **Cumuls** conservent leur dernier cadrage et leur zoom après fermeture et après rechargement du panneau. Chaque bouton a sa mémoire dans le navigateur de l'appareil. **Cadrage initial** revient toujours à l'URL configurée et mémorise ce retour. Modifier cette URL invalide l'ancien cadrage du bouton. Les réglages des autres cartes restent indépendants.
+
+Dans **Personnalisation → Thème**, choisir **Clair** (par défaut, rendu actuel), **Sombre**, **Automatique** (suit Home Assistant) ou **Programmé**. Le mode programmé utilise par défaut le sombre de **20:00 à 08:00**, avec deux heures modifiables et distinctes. Les heures suivent le fuseau configuré dans Home Assistant, y compris les changements d'heure. La bascule se fait à la première vérification dans les 15 secondes suivant l'heure choisie, y compris quand une carte est ouverte. Un changement dans le brouillon est prévisualisé ; Annuler rétablit le thème enregistré. Les réglages de thème sont partagés ; la mémoire des cadrages reste locale à chaque appareil.
+
+Dans **Notifications**, activer **Changement de vigilance Météo-France** et choisir les destinataires. Cette option est désactivée par défaut. Elle surveille le même capteur que l'encadré de vigilance, une fois par minute, même sans panneau ouvert. Le premier relevé fiable sert de référence après activation ou redémarrage : aucune notification initiale n'est créée. Les hausses, les baisses, le retour au vert et les changements de phénomènes à couleur générale inchangée déclenchent ensuite un message, avec le lien officiel. Les actualisations identiques et les données indisponibles ou trop anciennes ne déclenchent rien. Changer de département établit une nouvelle référence. Les changements de vigilance ne sont pas bloqués par le délai de rappel des autres alertes ; un destinataire en échec est réessayé sans renvoyer aux destinataires déjà servis.
+
+Dans une **iframe**, le panneau masque la barre latérale du Home Assistant intérieur et récupère sa largeur. Le menu du tableau de bord parent reste intact. Le correctif suit uniquement le `ha-drawer` qui contient Station Météo, accepte son rendu tardif et réapplique son style si ce rendu est reconstruit. Il utilise un élément `style` standard plutôt que des feuilles CSS construites. À la sortie de Station Météo ou au retrait du panneau, le style, les observateurs et les temporisations sont supprimés ; le menu intérieur retrouve son fonctionnement normal. Hors iframe, aucune modification n'est appliquée au tiroir Home Assistant. Une structure de tiroir non reconnue conserve ses menus. Un tiroir modal déjà ouvert est laissé à Home Assistant jusqu'à sa fermeture normale, pour éviter de masquer un dialogue qui bloquerait encore la page.
+
+Le fichier **saints.json** fourni par l'utilisateur, avec les prénoms supplémentaires, est intégré pour les **366 dates**. Au premier démarrage avec ce paquet, les anciennes entrées fournies encore présentes dans `/config/station_meteo/almanac/saints.json` sont remplacées par leurs nouvelles versions ; les entrées corrigées localement sont conservées. Citations et dictons personnalisés restent inchangés. Le fichier `saints-legacy.json` sert uniquement de référence à cette migration. Le rechargement de l'intégration relit les fichiers fournis et réinitialise les valeurs par défaut de l'almanach.
+
+La palette sombre et la modification de l'Iframe est adaptée de la contribution de **stephanerosso59-debug**, [pull request #1](https://github.com/RenaudSub/Station-Meteo/pull/1).
+
+Après remplacement du composant, redémarrer Home Assistant puis actualiser avec **Ctrl+F5**. Les données d'archive et les fichiers d'éphémérides personnalisés situés dans `/config/station_meteo/` sont conservés.
 
 ## Version 1.3.0 — Cumuls et commandes compactes
 

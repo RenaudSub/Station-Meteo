@@ -27,8 +27,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         runtime["config"]["map_buttons"] = normalize_map_buttons(saved.get("map_buttons"))
     if "almanac" not in runtime:
         service = LocalAlmanac(hass.config.path(DOMAIN, "almanac"))
-        await hass.async_add_executor_job(service.initialize)
         runtime["almanac"] = service
+    await hass.async_add_executor_job(runtime["almanac"].initialize)
     if not runtime.get("registered"):
         image_directory = Path(hass.config.path(DOMAIN, "images"))
         await hass.async_add_executor_job(image_directory.mkdir, 0o755, True, True)
@@ -42,7 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await panel_custom.async_register_panel(
         hass, frontend_url_path=PANEL_PATH, webcomponent_name="station-meteo-panel",
         sidebar_title="Station Météo", sidebar_icon="mdi:weather-partly-cloudy",
-        module_url=f"/{DOMAIN}/frontend/station-meteo.js?v={VERSION}&build=1",
+        module_url=f"/{DOMAIN}/frontend/station-meteo.js?v={VERSION}&build=2",
         require_admin=False, config={"version": VERSION},
     )
     runtime["notifications_manager"] = NotificationManager(hass, runtime)

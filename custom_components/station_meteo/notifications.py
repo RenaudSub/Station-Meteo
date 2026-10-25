@@ -10,9 +10,18 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 from .const import DEFAULT_NOTIFICATIONS
 from .forecast import async_forecasts
+from .vigilance import current_alerts
 
 _LOGGER = logging.getLogger(__name__)
 STORM = {"lightning", "lightning-rainy"}
+
+
+def vigilance_signature(snapshot):
+    """Ignore report timestamps, attribute order, and unavailable cached data."""
+    if snapshot.get('status') != 'available' or snapshot.get('level') not in (1, 2, 3, 4) or not snapshot.get('entity_id'):
+        return None
+    phenomena = tuple(sorted((str(p['name']).strip().casefold(), p['level']) for p in snapshot.get('phenomena', []) if p.get('level') in (2, 3, 4)))
+    return snapshot['entity_id'], snapshot.get('department'), snapshot['level'], phenomena
 
 
 def pressure_delta(samples, now):
@@ -41,6 +50,8 @@ class NotificationManager:
         self.forecast_entity = None
         self._cancel = None
         self._busy = False
+        self.vigilance_seen = None
+        self.vigilance_pending = None
         self.dictionaries = {lang: json.loads((Path(__file__).parent / "frontend" / "i18n" / f"{lang}.json").read_text()) for lang in ("fr", "en", "es")}
 
     def start(self):
@@ -96,6 +107,7 @@ class NotificationManager:
             self.samples.clear()
         if not opts["enabled"] or not opts["recipients"]:
             self.latched.clear()
+            self.vigilance_seen = self.vigilance_pending = None
             return
         w = self.state("weather") or self.state("weather_fallback")
         wid = tuple(cfg.get("entities", {}).get(role) for role in ("weather", "weather_fallback"))
@@ -125,6 +137,7 @@ class NotificationManager:
         if lang == "auto":
             lang = getattr(self.hass.config, "language", "fr")[:2]
         dictionary = self.dictionaries.get(lang, self.dictionaries["en"])
+        await self._check_vigilance(opts, dictionary)
         for key, active in alerts.items():
             if not active:
                 self.latched.discard(key)
@@ -147,3 +160,46 @@ class NotificationManager:
             if succeeded:
                 self.latched.add(key)
                 self.sent[key] = now
+
+    async def _check_vigilance(self, opts, dictionary):
+        if not opts['vigilance']:
+            self.vigilance_seen = self.vigilance_pending = None
+            return
+        snapshot = current_alerts(self.hass, self.runtime)
+        signature = vigilance_signature(snapshot)
+        if signature is None:
+            return
+        if self.vigilance_seen is None or self.vigilance_seen[:2] != signature[:2]:
+            self.vigilance_seen = signature
+            self.vigilance_pending = None
+            return
+        if signature != self.vigilance_seen:
+            previous = self.vigilance_seen
+            self.vigilance_seen = signature
+            old_level = dictionary[f'vigilance_level_{previous[2]}']
+            level = dictionary[f'vigilance_level_{signature[2]}']
+            change = f'{old_level} → {level}' if previous[2] != signature[2] else level
+            details = ', '.join(f"{p['name']} : {dictionary['vigilance_level_'+str(p['level'])]}" for p in snapshot.get('phenomena', []) if p.get('level') in (2, 3, 4)) or dictionary['vigilance_clear']
+            department = f" ({snapshot['department']})" if snapshot.get('department') else ''
+            message = dictionary['alert_vigilance'].format(department=department, change=change, phenomena=details)
+            message += '\n'+snapshot.get('source', 'https://vigilance.meteofrance.fr/fr')
+            self.vigilance_pending = {'message': message, 'delivered': set()}
+        pending = self.vigilance_pending
+        if pending is None:
+            return
+        # Distinct vigilance updates bypass the general sensor cooldown. Failed
+        # recipients retry without duplicating delivery to successful recipients.
+        for target in opts['recipients']:
+            if target in pending['delivered']:
+                continue
+            domain, service = target.split('.', 1)
+            data = {'title': f"Station Météo — {self.runtime['config']['location']}", 'message': pending['message']}
+            if domain == 'persistent_notification':
+                data['notification_id'] = 'station_meteo_vigilance'
+            try:
+                await self.hass.services.async_call(domain, service, data, blocking=True)
+                pending['delivered'].add(target)
+            except HomeAssistantError:
+                _LOGGER.warning('Failed to send vigilance notification to %s', target, exc_info=True)
+        if all(target in pending['delivered'] for target in opts['recipients']):
+            self.vigilance_pending = None

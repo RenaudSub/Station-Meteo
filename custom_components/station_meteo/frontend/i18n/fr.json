@@ -342,5 +342,17 @@
   "accumulation_6": "Lame 48 h",
   "accumulation_7": "Lame 72 h",
   "accumulation_4": "Lame depuis 6 h UTC",
-  "map_forecast_time": "Prévision du"
+  "map_forecast_time": "Prévision du",
+  "theme": "Thème",
+  "theme_mode": "Apparence",
+  "theme_light": "Clair (par défaut)",
+  "theme_dark": "Sombre",
+  "theme_auto": "Automatique (Home Assistant)",
+  "theme_schedule": "Programmé",
+  "theme_dark_start": "Passer au thème sombre à",
+  "theme_dark_end": "Revenir au thème clair à",
+  "theme_schedule_help": "Les horaires suivent le fuseau horaire de Home Assistant :",
+  "notify_vigilance": "Changement de vigilance Météo-France",
+  "notify_vigilance_help": "Notifie les hausses, les baisses et les changements de phénomènes du capteur de vigilance configuré. Le premier relevé sert de référence. Les changements de vigilance ne sont pas bloqués par le délai entre les autres alertes.",
+  "alert_vigilance": "La vigilance Météo-France{department} a changé : {change}. {phenomena}"
 }

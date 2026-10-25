@@ -342,5 +342,17 @@
   "accumulation_6": "Lámina 48 h",
   "accumulation_7": "Lámina 72 h",
   "accumulation_4": "Desde las 6 h UTC",
-  "map_forecast_time": "Previsión para"
+  "map_forecast_time": "Previsión para",
+  "theme": "Tema",
+  "theme_mode": "Apariencia",
+  "theme_light": "Claro (predeterminado)",
+  "theme_dark": "Oscuro",
+  "theme_auto": "Automático (Home Assistant)",
+  "theme_schedule": "Programado",
+  "theme_dark_start": "Cambiar a oscuro a las",
+  "theme_dark_end": "Volver a claro a las",
+  "theme_schedule_help": "Los horarios usan la zona horaria de Home Assistant:",
+  "notify_vigilance": "Cambios de vigilancia de Météo-France",
+  "notify_vigilance_help": "Notifica aumentos, descensos y cambios de fenómenos del sensor de vigilancia configurado. La primera lectura sirve de referencia. Los cambios de vigilancia no están bloqueados por el intervalo de otras alertas.",
+  "alert_vigilance": "La vigilancia de Météo-France{department} ha cambiado: {change}. {phenomena}"
 }

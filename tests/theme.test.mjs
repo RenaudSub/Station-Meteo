@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {themeIsDark} from '../custom_components/station_meteo/frontend/theme.js';
+const cfg={theme:'schedule',theme_dark_start:'20:00',theme_dark_end:'08:00'};
+const at=s=>Date.parse(s);
+assert.equal(themeIsDark({},true),false);
+assert.equal(themeIsDark({theme:'light'},true),false);
+assert.equal(themeIsDark({theme:'dark'},false),true);
+assert.equal(themeIsDark({theme:'auto'},true),true);
+assert.equal(themeIsDark({theme:'auto'},false),false);
+for(const [utc,dark] of [['2026-10-25T18:59:00Z',false],['2026-10-25T19:00:00Z',true],['2026-10-26T06:59:00Z',true],['2026-10-26T07:00:00Z',false]])assert.equal(themeIsDark(cfg,false,at(utc),'Europe/Paris'),dark,utc);
+const repeat={theme:'schedule',theme_dark_start:'02:15',theme_dark_end:'02:45'};
+for(const utc of ['2026-10-25T00:30:00Z','2026-10-25T01:30:00Z'])assert.equal(themeIsDark(repeat,false,at(utc),'Europe/Paris'),true);
+assert.equal(themeIsDark(repeat,false,at('2026-10-25T02:30:00Z'),'Europe/Paris'),false);
+assert.equal(themeIsDark({...cfg,theme_dark_start:'08:00',theme_dark_end:'20:00'},false,at('2026-10-25T12:00:00Z'),'Europe/Paris'),true);
+assert.equal(themeIsDark({...cfg,theme_dark_start:'08:00',theme_dark_end:'08:00'}),false);
+assert.equal(themeIsDark(cfg,false,at('2026-10-25T20:00:00Z'),'invalid/zone'),false);
+console.log('Theme passed: light default, forced modes, HA auto, overnight/day schedules, exact boundaries and repeated DST hour.');

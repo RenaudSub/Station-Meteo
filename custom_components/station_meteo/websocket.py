@@ -1,5 +1,6 @@
 """Authenticated panel settings and BTHome device discovery."""
 import math
+import re
 import sqlite3
 from urllib.parse import urlsplit, unquote
 import voluptuous as vol
@@ -90,6 +91,13 @@ def validate_config(hass, data):
         validate_image_url(url)
     if result["language"] not in ("auto", "fr", "en", "es"):
         raise ValueError("Invalid language")
+    if result["theme"] not in ("light", "dark", "auto", "schedule"):
+        raise ValueError("Invalid theme")
+    for key in ("theme_dark_start", "theme_dark_end"):
+        if not isinstance(result[key], str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", result[key]):
+            raise ValueError(f"Invalid {key}")
+    if result["theme"] == "schedule" and result["theme_dark_start"] == result["theme_dark_end"]:
+        raise ValueError("Dark start and end must differ")
     if result["wind_unit"] not in ("km/h", "m/s"):
         raise ValueError("Invalid wind unit")
     if result["pressure_mode"] not in ("absolute", "sea_level"):
@@ -112,7 +120,7 @@ def validate_config(hass, data):
     if not isinstance(opts, dict) or set(opts) - set(DEFAULT_NOTIFICATIONS):
         raise ValueError("Invalid notifications")
     opts = {**DEFAULT_NOTIFICATIONS, **opts}
-    for key in ("enabled", "pressure", "rain", "gust", "storm"):
+    for key in ("enabled", "pressure", "rain", "gust", "storm", "vigilance"):
         if not isinstance(opts[key], bool):
             raise ValueError(f"Invalid notification {key}")
     for key, lo, hi in (("pressure_drop", 0.5, 20), ("gust_threshold", 1, 250), ("cooldown", 5, 1440)):

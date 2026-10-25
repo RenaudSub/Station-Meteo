@@ -82,6 +82,11 @@ async def test_forecast_storm_and_target_validation(tmp_path):
     try:
         hass.states.async_set('weather.test','partlycloudy',{'supported_features':2})
         assert validate_config(hass,cfg)['notifications']['enabled']
+        assert validate_config(hass,cfg)['theme'] == 'light'
+        assert validate_config(hass,{**cfg,'theme':'schedule','theme_dark_start':'20:00','theme_dark_end':'08:00'})['theme']=='schedule'
+        assert validate_config(hass,{**cfg,'notifications':{**cfg['notifications'],'vigilance':True}})['notifications']['vigilance']
+        for invalid in ({'theme':'night'}, {'theme_dark_start':'25:00'}, {'theme_dark_end':'8:00'}, {'theme_dark_start':True}, {'theme':'schedule','theme_dark_start':'08:00','theme_dark_end':'08:00'}):
+            with pytest.raises(ValueError):validate_config(hass,{**cfg,**invalid})
         for opts in ({'enabled':'yes'},{'cooldown':0},{'gust_threshold':float('nan')},{'recipients':['notify.nonexistent']},{'extra':True}):
             with pytest.raises(ValueError):validate_config(hass,{**cfg,'notifications':{**DEFAULT_NOTIFICATIONS,**opts}})
         await manager._check(20000)

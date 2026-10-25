@@ -65,6 +65,23 @@ class LocalAlmanac:
             path = self.directory / f"{kind}.json"
             if not path.exists():
                 self._write(path, encoded(self.defaults[kind]))
+            elif kind == 'saints':
+                self._upgrade_saints(path)
+
+    def _upgrade_saints(self, path):
+        """Enrich unchanged legacy entries, preserving corrections made locally."""
+        legacy_path = self.defaults_directory / 'saints-legacy.json'
+        if not legacy_path.exists():
+            return
+        try:
+            legacy = decode_calendar('saints', legacy_path.read_bytes())
+            current = decode_calendar('saints', path.read_bytes())
+        except (OSError, ValueError, UnicodeError):
+            # An invalid personal file is never replaced by an upgrade.
+            return
+        updated = {key: self.defaults['saints'][key] if value == legacy[key] else value for key, value in current.items()}
+        if updated != current:
+            self._write(path, encoded(updated))
 
     def _write(self, path, content):
         temporary = None

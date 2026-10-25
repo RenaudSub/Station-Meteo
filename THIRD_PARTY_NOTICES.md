@@ -60,3 +60,9 @@ The default satellite uses Meteociel's original Meteosat12 visible-composition
 GIF animation, with its embedded dates and copyright preserved. A link to
 Meteociel and the satellite data credit are shown below the map. None of these
 images or animation files is included in the distribution.
+
+## Dark theme contribution
+
+The dark-only CSS palette is adapted from pull request #1 by stephanerosso59-debug:
+https://github.com/RenaudSub/Station-Meteo/pull/1
+The light theme remains the default. Theme scheduling and per-device map viewport persistence are implemented separately. The iframe sidebar patch from that PR is not included.
