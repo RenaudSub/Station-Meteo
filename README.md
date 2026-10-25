@@ -1,4 +1,4 @@
-# Station Météo — v1.4.0
+# Station Météo — v1.4.1
 
 Cette intégration personnalisée Home Assistant a été créée pour exploiter les données de la station météo Ecowitt WS90 et les présenter dans un panneau dédié, clair et personnalisable. Elle s’appuie sur les capteurs disponibles dans Home Assistant, notamment via BTHome, et propose une interface adaptée aux ordinateurs, tablettes et smartphones, en français, anglais et espagnol.
 
@@ -25,6 +25,8 @@ Cette intégration personnalisée Home Assistant a été créée pour exploiter 
 ### Carte Satéllite
 
 [![Carte Satéllite](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)](https://logisub.com/assets/sm-sat.jpg?v=0.10.0)
+## Version 1.4.1
+fix : Rendu sur tablettes stable
 
 ## Version 1.4.0 — Cadrages mémorisés, thèmes et vigilance
 
