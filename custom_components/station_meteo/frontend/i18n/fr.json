@@ -354,5 +354,12 @@
   "theme_schedule_help": "Les horaires suivent le fuseau horaire de Home Assistant :",
   "notify_vigilance": "Changement de vigilance Météo-France",
   "notify_vigilance_help": "Notifie les hausses, les baisses et les changements de phénomènes du capteur de vigilance configuré. Le premier relevé sert de référence. Les changements de vigilance ne sont pas bloqués par le délai entre les autres alertes.",
-  "alert_vigilance": "La vigilance Météo-France{department} a changé : {change}. {phenomena}"
+  "alert_vigilance": "La vigilance Météo-France{department} a changé : {change}. {phenomena}",
+  "radar_lightning": "Aff. foudre",
+  "radar_lightning_none": "Pas de foudre",
+  "radar_lightning_5m": "Impacts sur 5 min",
+  "radar_lightning_1h": "Impacts sur 1 h",
+  "radar_station_values": "Valeurs des cumuls",
+  "radar_estimated_values": "Afficher les valeurs de cumul estimées",
+  "radar_measured_values": "Afficher les valeurs des stations"
 }

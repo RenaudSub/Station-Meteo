@@ -270,7 +270,7 @@ async def ws_satellite(hass, connection, msg):
     connection.send_result(msg["id"], await async_satellite(hass, runtime, msg["index"]))
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4)), vol.Optional("product"): vol.In([1, 2, 3, 4, 5, 6, 7, 15]), vol.Optional("viewport"): {vol.Required("x"): vol.Coerce(float), vol.Required("y"): vol.Coerce(float), vol.Required("zoom"): vol.Coerce(float)}, vol.Optional("options"): {vol.Optional("duration"): vol.In([2, 5, 10, 30, 60, 120]), vol.Optional("cities"): vol.In([0, 1, 2, 3]), vol.Optional("roads"): bool, vol.Optional("rivers"): bool, vol.Optional("relief"): bool}})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/meteociel", vol.Required("index"): vol.All(int, vol.Range(min=0, max=len(DEFAULT_MAP_BUTTONS)+4)), vol.Optional("product"): vol.In([1, 2, 3, 4, 5, 6, 7, 15]), vol.Optional("viewport"): {vol.Required("x"): vol.Coerce(float), vol.Required("y"): vol.Coerce(float), vol.Required("zoom"): vol.Coerce(float)}, vol.Optional("options"): {vol.Optional("duration"): vol.In([2, 5, 10, 30, 60, 120]), vol.Optional("cities"): vol.In([0, 1, 2, 3]), vol.Optional("roads"): bool, vol.Optional("rivers"): bool, vol.Optional("relief"): bool, vol.Optional("foudre"): vol.In([0, 1, 2]), vol.Optional("estimated_values"): bool, vol.Optional("stations"): bool}})
 @websocket_api.async_response
 async def ws_meteociel(hass, connection, msg):
     runtime = hass.data.get(DOMAIN, {})

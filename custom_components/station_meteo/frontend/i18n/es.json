@@ -354,5 +354,12 @@
   "theme_schedule_help": "Los horarios usan la zona horaria de Home Assistant:",
   "notify_vigilance": "Cambios de vigilancia de Météo-France",
   "notify_vigilance_help": "Notifica aumentos, descensos y cambios de fenómenos del sensor de vigilancia configurado. La primera lectura sirve de referencia. Los cambios de vigilancia no están bloqueados por el intervalo de otras alertas.",
-  "alert_vigilance": "La vigilancia de Météo-France{department} ha cambiado: {change}. {phenomena}"
+  "alert_vigilance": "La vigilancia de Météo-France{department} ha cambiado: {change}. {phenomena}",
+  "radar_lightning": "Mostrar rayos",
+  "radar_lightning_none": "Sin rayos",
+  "radar_lightning_5m": "Impactos en 5 min",
+  "radar_lightning_1h": "Impactos en 1 h",
+  "radar_station_values": "Valores de precipitación",
+  "radar_estimated_values": "Mostrar valores estimados de acumulación",
+  "radar_measured_values": "Mostrar valores de las estaciones"
 }

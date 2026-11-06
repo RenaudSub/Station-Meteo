@@ -75,15 +75,41 @@ def tile_plan(view):
 def radar_metadata(html, now=None):
     """Parse declared dates and palette, without evaluating upstream JavaScript."""
     now = now or datetime.now(timezone.utc)
-    dates = sorted(set(re.findall(r'radardate2\[\d+\]\s*=\s*["\'](\d{12})["\']', html)))
-    times = [datetime.strptime(value, "%Y%m%d%H%M").replace(tzinfo=timezone.utc) for value in dates]
-    times = [value for value in times if value <= now][-12:]
+    dates = dict(re.findall(r'radardate2\[(\d+)\]\s*=\s*["\'](\d{12})["\']', html))
+    folders = dict(re.findall(r'radardate\[(\d+)\]\s*=\s*["\']([0-9/]+)["\']', html))
+    declared = [
+        (
+            index,
+            datetime.strptime(value, "%Y%m%d%H%M").replace(tzinfo=timezone.utc),
+            value,
+        )
+        for index, value in sorted(dates.items(), key=lambda pair: int(pair[0]))
+    ]
+    declared = [(index, time, token) for index, time, token in declared if time <= now][-12:]
+    times = [time for _, time, _ in declared]
     if not times:
         raise ValueError("No declared radar frames")
     colors = dict(re.findall(r'keyColors\[(\d+)\]\s*=\s*["\'](#[0-9A-Fa-f]{6})["\']', html))
     values = dict(re.findall(r'keyValues\[(\d+)\]\s*=\s*([0-9.]+)', html))
-    palette = [{"color": colors[k], "value": float(values[k])} for k in sorted(colors, key=int) if k in values][:64]
-    return {"times": [value.isoformat() for value in times], "palette": palette}
+    palette = [
+        {"color": colors[key], "value": float(values[key])}
+        for key in sorted(colors, key=int)
+        if key in values
+    ][:64]
+    content = {"times": [value.isoformat() for value in times], "palette": palette}
+    # Conserver le chemin publié par Météociel, qui peut ne pas avoir de zéro initial.
+    if folders:
+        content["frame_specs"] = [
+            {
+                "index": int(index),
+                "time": time.isoformat(),
+                "token": token,
+                "folder": folders.get(index, time.strftime("%Y/%m/%d")),
+                "forecast": False,
+            }
+            for index, time, token in declared
+        ]
+    return content
 
 
 def accumulation_metadata(html, product, now=None):
@@ -102,7 +128,11 @@ def accumulation_metadata(html, product, now=None):
             if len(token) != 12:
                 continue
             time = datetime.strptime(token, '%Y%m%d%H%M').replace(tzinfo=timezone.utc)
-            if time > now or folder != time.strftime('%Y/%m/%d'):
+            try:
+                folder_date = datetime.strptime(folder, '%Y/%m/%d').date()
+            except ValueError:
+                continue
+            if time > now or folder_date != time.date():
                 continue
         else:
             if previous is None or len(token) != 4 or not re.fullmatch(r'\d{1,6}', folder):
@@ -113,10 +143,23 @@ def accumulation_metadata(html, product, now=None):
             if (time-datetime.fromisoformat(content['times'][-1])).total_seconds() > 3*3600:
                 continue
         previous = time
-        specs.append({'time': time.isoformat(), 'token': token, 'folder': folder, 'forecast': forecast})
+        specs.append({'index': int(index),'time': time.isoformat(), 'token': token, 'folder': folder, 'forecast': forecast})
     if not specs:
         raise ValueError('No declared accumulation frames')
     content['frame_specs'] = specs
+    request_values = {}
+    for key, pattern in (
+        ("date", r'var\s+firsttime\s*=\s*(\d+)'),
+        ("numEch", r'var\s+maxEch\s*=\s*(\d+)'),
+        ("mode", r'var\s+currentDataMode\s*=\s*(\d+)'),
+        ("archiveheure", r'var\s+hourlyArchive\s*=\s*(\d+)'),
+    ):
+        found = re.search(pattern, html)
+        if found:
+            request_values[key] = int(found[1])
+
+    if len(request_values) == 4:
+        content['station_request'] = request_values
     return content
 
 
@@ -145,6 +188,70 @@ async def read_source(session, url, params=None):
                 raise ValueError("Meteociel response too large")
             chunks.append(chunk)
         return b"".join(chunks).decode("utf-8", errors="replace")
+
+
+async def station_values(session, view, request, frame_specs):
+    """Fetch Météociel's station observations for the visible accumulation frames."""
+    if not request or not frame_specs:
+        return {}
+    payload = {
+        **request,
+        "zoom": view["zoom"],
+        "offsetx": view["x"],
+        "offsety": view["y"],
+        "width": 768,
+        "height": 768,
+    }
+    url = "https://modeles14.meteociel.fr/radar/tiles/getdata.php"
+    async with session.post(
+        url,
+        data=payload,
+        allow_redirects=False,
+        timeout=aiohttp.ClientTimeout(total=25),
+        headers={"Cache-Control": "no-cache", "Referer": RADAR_PAGE},
+    ) as response:
+        if response.status != 200:
+            raise ValueError(
+                f"Meteociel station data unavailable (HTTP {response.status})"
+            )
+        chunks, size = [], 0
+        async for chunk in response.content.iter_chunked(32768):
+            size += len(chunk)
+            if size > 4 * 1024 * 1024:
+                raise ValueError("Meteociel station response too large")
+            chunks.append(chunk)
+    data = json.loads(b"".join(chunks))
+    metadata = data.get("meta", {})
+    by_frame = {}
+    for sample in data.get("data", []):
+        points = []
+        for station_id, reading in sample.get("data", {}).items():
+            station = metadata.get(station_id)
+            try:
+                station_type = int(station.get("t", 0)) if station else 0
+            except (TypeError, ValueError):
+                continue
+            if not station or station_type not in (1, 2, 3):
+                continue
+            try:
+                value = float(reading.get("v"))
+                x = (float(station["x"]) * 16 - (view["x"] - 384)) * view["scale"]
+                y = (float(station["y"]) * 16 - (view["y"] - 384)) * view["scale"]
+            except (TypeError, ValueError, KeyError, OverflowError):
+                continue
+            if (
+                not all(math.isfinite(v) for v in (x, y, value))
+                or not (-8 <= x <= 776 and -8 <= y <= 776)
+                or value < 1
+            ):
+                continue
+            points.append({
+                "x": x,
+                "y": y,
+                "value": f"{value:.1f}".rstrip("0").rstrip("."),
+            })
+        by_frame[int(sample.get("ech", -1))] = points
+    return by_frame
 
 
 async def city_labels(session, view, density=None):
@@ -272,7 +379,7 @@ async def async_image_map(session, runtime, card, spec):
     return {"kind": spec["kind"], "image_only": True, "embedded_time": True,
             "frames": [{"url": image_url, "time": None}], "source": card["url"],
             "animated": urlsplit(cached["url"]).path.endswith(".gif"),
-            "credit": "Météociel / EUMETSAT — Meteosat12" if spec["kind"] == "satellite" else "Météociel — observations météo"}
+            "credit": "Météociel / EUMETSAT - Meteosat12" if spec["kind"] == "satellite" else "Météociel - observations météo"}
 
 
 
@@ -358,7 +465,17 @@ async def async_meteociel(hass, runtime, index, options=None, requested_view=Non
             selected = product
         if view["kind"] == "radar":
             view = {**view, "product": selected}
-        settings = lightning_options({"cities": 3, "roads": True, "rivers": True, "relief": True, **(options or {})} if view["kind"] == "radar" else options)
+        if view["kind"] == "radar":
+            layer_options = {key: value for key, value in (options or {}).items()
+                             if key in {"duration", "cities", "roads", "rivers", "relief"}}
+            settings = lightning_options({"cities": 3, "roads": True, "rivers": True, "relief": True, **layer_options})
+        else:
+            settings = lightning_options(options)
+        radar_settings = {
+            "foudre": int((options or {}).get("foudre", 0)) if type((options or {}).get("foudre", 0)) is int else 0,
+            "estimated_values": bool((options or {}).get("estimated_values", False)),
+            "stations": bool((options or {}).get("stations", False)),
+        }
         if view["kind"] in ("humidity", "rain24", "gusts", "satellite", "radar_animation"):
             return await async_image_map(async_get_clientsession(hass), runtime, card, view)
         plan = tile_plan(view)
@@ -380,6 +497,24 @@ async def async_meteociel(hass, runtime, index, options=None, requested_view=Non
                 cache[key] = cached
         content = cached["content"]
         frames, backgrounds = [], []
+        station_frames = {}
+        if view["kind"] == "radar" and selected and radar_settings["stations"]:
+            request = content.get("station_request")
+            station_cache = runtime.setdefault("meteociel_station_cache", {})
+            station_cache = {key: value for key, value in station_cache.items()
+                             if (now - value["at"]).total_seconds() < 600}
+            runtime["meteociel_station_cache"] = station_cache
+            station_key = (selected, round(view["x"], 1), round(view["y"], 1), round(view["zoom"], 2), request.get("date") if request else None)
+            station_cached = station_cache.get(station_key)
+            if not station_cached or (now - station_cached["at"]).total_seconds() > 120:
+                try:
+                    values = await station_values(session, view, request, content.get("frame_specs", []))
+                    station_cached = {"at": now, "values": values}
+                    station_cache[station_key] = station_cached
+                except (aiohttp.ClientError, TimeoutError, ValueError, TypeError, KeyError, OverflowError) as error:
+                    _LOGGER.debug("Meteociel station values unavailable: %s", error)
+                    station_cached = {"at": now, "values": {}}
+            station_frames = station_cached["values"]
         lightning = view["kind"] == "lightning"
         for tile in plan:
             # The radar viewer omits the overlay entirely for mask 000;
@@ -394,18 +529,31 @@ async def async_meteociel(hass, runtime, index, options=None, requested_view=Non
             time = content["time"]
             frames.append({"time": time, "tiles": [], "points": projected_points(content["items"], view, minutes=settings["duration"])})
             start = (datetime.fromisoformat(time) - timedelta(minutes=settings["duration"])).isoformat()
-            credit = f"Météociel / Blitzortung — {settings['duration']} min"
+            credit = f"Météociel / Blitzortung - {settings['duration']} min"
         else:
-            for spec in content.get('frame_specs', [{'time': time, 'forecast': False} for time in content['times']]):
+            for fallback_index, spec in enumerate(content.get('frame_specs', [{'time': time, 'forecast': False} for time in content['times']])):
                 time = spec['time']
                 value = datetime.fromisoformat(time)
                 folder = spec.get('folder', value.strftime('%Y/%m/%d'))
                 prefix = f'https://modeles14.meteociel.fr/radar/{"tilespiaf" if spec["forecast"] else "tileslame" if selected else "tiles"}/{folder}'
                 token = spec.get('token', value.strftime('%Y%m%d%H%M'))
                 token = (ACCUMULATIONS[selected] if selected and not spec['forecast'] else '') + token
-                frames.append({"time": time, "forecast": spec['forecast'], "tiles": [{"url": f'{prefix}/{tile["level"] + 1}/{token}-{tile["x"]}-{tile["y"]}.png', "rect": tile["rect"]} for tile in plan]})
+                overlays = []
+                if selected == 0 and radar_settings["foudre"] in (1, 2):
+                    suffix = "-s" if radar_settings["foudre"] == 2 else ""
+                    overlays = [{"url": f'https://modeles14.meteociel.fr/radar/tilesfoudre/{folder}/{tile["level"] + 1}/{token}-{tile["x"]}-{tile["y"]}{suffix}.png', "rect": tile["rect"]} for tile in plan]
+                elif selected in ACCUMULATIONS and selected != 15 and radar_settings["estimated_values"] and not spec['forecast']:
+                    prefixes = {1: "n", 2: "n24h_", 3: "n12h_", 4: "nclim6z_", 5: "n5m_", 6: "n48h_", 7: "n72h_"}
+                    estimated_token = prefixes[selected] + spec.get('token', value.strftime('%Y%m%d%H%M'))
+                    overlays = [{"url": f'https://modeles14.meteociel.fr/radar/tileslame/{folder}/{tile["level"] + 1}/{estimated_token}-{tile["x"]}-{tile["y"]}.png', "rect": tile["rect"]} for tile in plan]
+                frame = {"time": time, "forecast": spec['forecast'],
+                         "tiles": [{"url": f'{prefix}/{tile["level"] + 1}/{token}-{tile["x"]}-{tile["y"]}.png', "rect": tile["rect"]} for tile in plan],
+                         "overlays": overlays}
+                if selected and radar_settings["stations"]:
+                    frame["stations"] = station_frames.get(spec.get("index", fallback_index), [])
+                frames.append(frame)
             start = None
-            credit = "Météociel — données Météo-France"
+            credit = "Météociel - données Météo-France"
         labels = await city_labels(session, view, settings["cities"])
         latest = datetime.fromisoformat(content['times'][-1] if view['kind'] == 'radar' else frames[-1]['time'])
         return {"kind": view["kind"], "viewport": view, "frames": frames, "backgrounds": backgrounds, "labels": labels,
