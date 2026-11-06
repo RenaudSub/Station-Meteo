@@ -19,7 +19,7 @@
     "recorder"
   ],
   "requirements": [
-    "Pillow==12.3.0",
+    "Pillow>=12.3.0,<14.0.0",
     "astral==2.2",
     "ephem==4.2.1"
   ],
