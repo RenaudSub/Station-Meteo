@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.storage import Store
 from .const import DOMAIN, DEFAULT_CONFIG, VERSION, PANEL_PATH, normalize_map_buttons
 from .websocket import async_register_commands
-from .notifications import NotificationManager
+from .notifications import NotificationManager, load_i18n_dictionaries
 from .image_upload import ImageUploadView
 from .almanac_data import LocalAlmanac
 from .archive import ArchiveService
@@ -45,7 +45,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         module_url=f"/{DOMAIN}/frontend/station-meteo.js?v={VERSION}&build=3",
         require_admin=False, config={"version": VERSION},
     )
-    runtime["notifications_manager"] = NotificationManager(hass, runtime)
+    dictionaries = await hass.async_add_executor_job(load_i18n_dictionaries)
+    runtime["notifications_manager"] = NotificationManager(
+    hass,
+    runtime,
+    dictionaries,
+    )
     runtime["notifications_manager"].start()
     runtime["archive"] = ArchiveService(hass, runtime)
     await runtime["archive"].start()
