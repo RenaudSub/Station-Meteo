@@ -1,13 +1,16 @@
 """Server-side opt-in alerts, independent of open dashboard tabs."""
+
 from collections import deque
 from datetime import timedelta
 import json
 import logging
 import math
 from pathlib import Path
-from homeassistant.helpers.event import async_track_time_interval
+
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
+
 from .const import DEFAULT_NOTIFICATIONS
 from .forecast import async_forecasts
 from .vigilance import current_alerts
@@ -18,10 +21,25 @@ STORM = {"lightning", "lightning-rainy"}
 
 def vigilance_signature(snapshot):
     """Ignore report timestamps, attribute order, and unavailable cached data."""
-    if snapshot.get('status') != 'available' or snapshot.get('level') not in (1, 2, 3, 4) or not snapshot.get('entity_id'):
+    if (
+        snapshot.get("status") != "available"
+        or snapshot.get("level") not in (1, 2, 3, 4)
+        or not snapshot.get("entity_id")
+    ):
         return None
-    phenomena = tuple(sorted((str(p['name']).strip().casefold(), p['level']) for p in snapshot.get('phenomena', []) if p.get('level') in (2, 3, 4)))
-    return snapshot['entity_id'], snapshot.get('department'), snapshot['level'], phenomena
+    phenomena = tuple(
+        sorted(
+            (str(p["name"]).strip().casefold(), p["level"])
+            for p in snapshot.get("phenomena", [])
+            if p.get("level") in (2, 3, 4)
+        )
+    )
+    return (
+        snapshot["entity_id"],
+        snapshot.get("department"),
+        snapshot["level"],
+        phenomena,
+    )
 
 
 def pressure_delta(samples, now):
@@ -38,8 +56,19 @@ def pressure_delta(samples, now):
     return samples[-1][1] - baseline[1]
 
 
+def load_i18n_dictionaries():
+    """Load notification translations from disk."""
+    i18n_path = Path(__file__).parent / "frontend" / "i18n"
+    return {
+        lang: json.loads(
+            (i18n_path / f"{lang}.json").read_text(encoding="utf-8")
+        )
+        for lang in ("fr", "en", "es")
+    }
+
+
 class NotificationManager:
-    def __init__(self, hass, runtime):
+    def __init__(self, hass, runtime, dictionaries):
         self.hass, self.runtime = hass, runtime
         self.samples = deque(maxlen=200)
         self.pressure_entity = None
@@ -52,10 +81,12 @@ class NotificationManager:
         self._busy = False
         self.vigilance_seen = None
         self.vigilance_pending = None
-        self.dictionaries = {lang: json.loads((Path(__file__).parent / "frontend" / "i18n" / f"{lang}.json").read_text()) for lang in ("fr", "en", "es")}
+        self.dictionaries = dictionaries
 
     def start(self):
-        self._cancel = async_track_time_interval(self.hass, self.check, timedelta(minutes=1))
+        self._cancel = async_track_time_interval(
+            self.hass, self.check, timedelta(minutes=1)
+        )
 
     def stop(self):
         if self._cancel:
@@ -64,25 +95,40 @@ class NotificationManager:
 
     def state(self, role):
         eid = self.runtime["config"].get("entities", {}).get(role)
-        s = self.hass.states.get(eid) if eid else None
-        return s if s and s.state not in ("unknown", "unavailable", "") else None
+        state = self.hass.states.get(eid) if eid else None
+        return (
+            state
+            if state and state.state not in ("unknown", "unavailable", "")
+            else None
+        )
 
     def value(self, role):
         state = self.state(role)
         if state is None:
             return None
         try:
-            v = float(state.state)
+            value = float(state.state)
         except ValueError:
             return None
-        if not math.isfinite(v):
+        if not math.isfinite(value):
             return None
-        u = str(state.attributes.get("unit_of_measurement", "")).lower()
+        unit = str(state.attributes.get("unit_of_measurement", "")).lower()
         if role == "pressure":
-            return v * {"pa": .01, "kpa": 10, "inhg": 33.8638866667, "mmhg": 1.3332239}.get(u, 1)
+            return value * {
+                "pa": 0.01,
+                "kpa": 10,
+                "inhg": 33.8638866667,
+                "mmhg": 1.3332239,
+            }.get(unit, 1)
         if role == "wind_gust":
-            return v * {"m/s": 3.6, "mph": 1.609344, "kn": 1.852, "kt": 1.852, "knots": 1.852}.get(u, 1)
-        return v
+            return value * {
+                "m/s": 3.6,
+                "mph": 1.609344,
+                "kn": 1.852,
+                "kt": 1.852,
+                "knots": 1.852,
+            }.get(unit, 1)
+        return value
 
     async def check(self, now):
         if self._busy:
@@ -100,38 +146,59 @@ class NotificationManager:
         if eid != self.pressure_entity:
             self.samples.clear()
             self.pressure_entity = eid
-        p = self.value("pressure")
-        if p is not None:
-            self.samples.append((now, p))
+        pressure = self.value("pressure")
+        if pressure is not None:
+            self.samples.append((now, pressure))
         else:
             self.samples.clear()
         if not opts["enabled"] or not opts["recipients"]:
             self.latched.clear()
             self.vigilance_seen = self.vigilance_pending = None
             return
-        w = self.state("weather") or self.state("weather_fallback")
-        wid = tuple(cfg.get("entities", {}).get(role) for role in ("weather", "weather_fallback"))
-        if wid != self.forecast_entity:
-            self.forecast, self.forecast_at, self.forecast_entity = [], 0, wid
-        if opts["storm"] and w and now - self.forecast_at >= 600:
+        weather = self.state("weather") or self.state("weather_fallback")
+        weather_ids = tuple(
+            cfg.get("entities", {}).get(role)
+            for role in ("weather", "weather_fallback")
+        )
+        if weather_ids != self.forecast_entity:
+            self.forecast, self.forecast_at, self.forecast_entity = (
+                [],
+                0,
+                weather_ids,
+            )
+        if opts["storm"] and weather and now - self.forecast_at >= 600:
             self.forecast_at = now
-            result = await async_forecasts(self.hass, cfg, now=now, kinds=("hourly",))
+            result = await async_forecasts(
+                self.hass, cfg, now=now, kinds=("hourly",)
+            )
             self.forecast = result["hourly"]
         forecast_storm = False
-        if w and now - self.forecast_at <= 1200:
-            for f in self.forecast:
-                dt = dt_util.parse_datetime(f.get("datetime", ""))
-                if dt and now <= dt.timestamp() <= now + 10800 and f.get("condition") in STORM:
+        if weather and now - self.forecast_at <= 1200:
+            for forecast in self.forecast:
+                dt = dt_util.parse_datetime(forecast.get("datetime", ""))
+                if (
+                    dt
+                    and now <= dt.timestamp() <= now + 10800
+                    and forecast.get("condition") in STORM
+                ):
                     forecast_storm = True
                     break
         delta = pressure_delta(self.samples, now)
         gust = self.value("wind_gust")
         rain = self.state("rain_status")
         alerts = {
-            "pressure": opts["pressure"] and delta is not None and delta <= -opts["pressure_drop"],
-            "rain": opts["rain"] and rain is not None and rain.state.lower() in ("on", "wet", "raining", "true"),
-            "gust": opts["gust"] and gust is not None and gust >= opts["gust_threshold"],
-            "storm": opts["storm"] and w is not None and (w.state in STORM or forecast_storm),
+            "pressure": opts["pressure"]
+            and delta is not None
+            and delta <= -opts["pressure_drop"],
+            "rain": opts["rain"]
+            and rain is not None
+            and rain.state.lower() in ("on", "wet", "raining", "true"),
+            "gust": opts["gust"]
+            and gust is not None
+            and gust >= opts["gust_threshold"],
+            "storm": opts["storm"]
+            and weather is not None
+            and (weather.state in STORM or forecast_storm),
         }
         lang = cfg.get("language", "auto")
         if lang == "auto":
@@ -142,64 +209,118 @@ class NotificationManager:
             if not active:
                 self.latched.discard(key)
                 continue
-            if key in self.latched or now - self.sent.get(key, -math.inf) < opts["cooldown"] * 60:
+            if (
+                key in self.latched
+                or now - self.sent.get(key, -math.inf) < opts["cooldown"] * 60
+            ):
                 continue
-            values = {"drop": f"{abs(delta or 0):.1f}", "gust": f"{gust or 0:.1f}"}
+            values = {
+                "drop": f"{abs(delta or 0):.1f}",
+                "gust": f"{gust or 0:.1f}",
+            }
             message = dictionary[f"alert_{key}"].format(**values)
             succeeded = False
             for target in opts["recipients"]:
                 domain, service = target.split(".", 1)
-                data = {"title": f"Station Météo — {cfg['location']}", "message": message}
+                data = {
+                    "title": f"Station Météo — {cfg['location']}",
+                    "message": message,
+                }
                 if domain == "persistent_notification":
                     data["notification_id"] = f"station_meteo_{key}"
                 try:
-                    await self.hass.services.async_call(domain, service, data, blocking=True)
+                    await self.hass.services.async_call(
+                        domain, service, data, blocking=True
+                    )
                     succeeded = True
                 except HomeAssistantError:
-                    _LOGGER.warning("Failed to send weather notification to %s", target, exc_info=True)
+                    _LOGGER.warning(
+                        "Failed to send weather notification to %s",
+                        target,
+                        exc_info=True,
+                    )
             if succeeded:
                 self.latched.add(key)
                 self.sent[key] = now
 
     async def _check_vigilance(self, opts, dictionary):
-        if not opts['vigilance']:
+        if not opts["vigilance"]:
             self.vigilance_seen = self.vigilance_pending = None
             return
         snapshot = current_alerts(self.hass, self.runtime)
         signature = vigilance_signature(snapshot)
         if signature is None:
             return
-        if self.vigilance_seen is None or self.vigilance_seen[:2] != signature[:2]:
+        if (
+            self.vigilance_seen is None
+            or self.vigilance_seen[:2] != signature[:2]
+        ):
             self.vigilance_seen = signature
             self.vigilance_pending = None
             return
         if signature != self.vigilance_seen:
             previous = self.vigilance_seen
             self.vigilance_seen = signature
-            old_level = dictionary[f'vigilance_level_{previous[2]}']
-            level = dictionary[f'vigilance_level_{signature[2]}']
-            change = f'{old_level} → {level}' if previous[2] != signature[2] else level
-            details = ', '.join(f"{p['name']} : {dictionary['vigilance_level_'+str(p['level'])]}" for p in snapshot.get('phenomena', []) if p.get('level') in (2, 3, 4)) or dictionary['vigilance_clear']
-            department = f" ({snapshot['department']})" if snapshot.get('department') else ''
-            message = dictionary['alert_vigilance'].format(department=department, change=change, phenomena=details)
-            message += '\n'+snapshot.get('source', 'https://vigilance.meteofrance.fr/fr')
-            self.vigilance_pending = {'message': message, 'delivered': set()}
+            old_level = dictionary[f"vigilance_level_{previous[2]}"]
+            level = dictionary[f"vigilance_level_{signature[2]}"]
+            change = (
+                f"{old_level} → {level}"
+                if previous[2] != signature[2]
+                else level
+            )
+            details = ", ".join(
+                f"{phenomenon['name']} : "
+                f"{dictionary['vigilance_level_' + str(phenomenon['level'])]}"
+                for phenomenon in snapshot.get("phenomena", [])
+                if phenomenon.get("level") in (2, 3, 4)
+            ) or dictionary["vigilance_clear"]
+            department = (
+                f" ({snapshot['department']})"
+                if snapshot.get("department")
+                else ""
+            )
+            message = dictionary["alert_vigilance"].format(
+                department=department,
+                change=change,
+                phenomena=details,
+            )
+            message += "\n" + snapshot.get(
+                "source", "https://vigilance.meteofrance.fr/fr"
+            )
+            self.vigilance_pending = {
+                "message": message,
+                "delivered": set(),
+            }
         pending = self.vigilance_pending
         if pending is None:
             return
-        # Distinct vigilance updates bypass the general sensor cooldown. Failed
-        # recipients retry without duplicating delivery to successful recipients.
-        for target in opts['recipients']:
-            if target in pending['delivered']:
+        # Distinct vigilance updates bypass the general sensor cooldown.
+        # Failed recipients retry without duplicating successful deliveries.
+        for target in opts["recipients"]:
+            if target in pending["delivered"]:
                 continue
-            domain, service = target.split('.', 1)
-            data = {'title': f"Station Météo — {self.runtime['config']['location']}", 'message': pending['message']}
-            if domain == 'persistent_notification':
-                data['notification_id'] = 'station_meteo_vigilance'
+            domain, service = target.split(".", 1)
+            data = {
+                "title": (
+                    f"Station Météo — {self.runtime['config']['location']}"
+                ),
+                "message": pending["message"],
+            }
+            if domain == "persistent_notification":
+                data["notification_id"] = "station_meteo_vigilance"
             try:
-                await self.hass.services.async_call(domain, service, data, blocking=True)
-                pending['delivered'].add(target)
+                await self.hass.services.async_call(
+                    domain, service, data, blocking=True
+                )
+                pending["delivered"].add(target)
             except HomeAssistantError:
-                _LOGGER.warning('Failed to send vigilance notification to %s', target, exc_info=True)
-        if all(target in pending['delivered'] for target in opts['recipients']):
+                _LOGGER.warning(
+                    "Failed to send vigilance notification to %s",
+                    target,
+                    exc_info=True,
+                )
+        if all(
+            target in pending["delivered"]
+            for target in opts["recipients"]
+        ):
             self.vigilance_pending = None
